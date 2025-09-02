@@ -1,0 +1,43 @@
+version: '3.8'
+
+services:
+  mongodb:
+    image: mongo:7.0
+    container_name: securevault-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    environment:
+      MONGO_INITDB_ROOT_USERNAME: admin
+      MONGO_INITDB_ROOT_PASSWORD: password
+      MONGO_INITDB_DATABASE: securevault
+    volumes:
+      - mongodb_data:/data/db
+      - ./scripts/mongo-init.js:/docker-entrypoint-initdb.d/mongo-init.js:ro
+    networks:
+      - securevault-network
+
+  securevault:
+    build: .
+    container_name: securevault-app
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      MONGODB_URI: mongodb://securevault:securevault@mongodb:27017/securevault
+      JWT_SECRET: dev-jwt-secret-change-in-production
+      VAULT_MASTER_KEY: dev-master-key-change-in-production
+      GIN_MODE: debug
+    depends_on:
+      - mongodb
+    networks:
+      - securevault-network
+    volumes:
+      - ./.env:/app/.env:ro
+
+volumes:
+  mongodb_data:
+
+networks:
+  securevault-network:
+    driver: bridge
