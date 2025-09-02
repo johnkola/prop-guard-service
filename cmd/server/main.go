@@ -105,9 +105,9 @@ func main() {
 	secretService := service.NewSecretService(secretRepo, userRepo, encryptionService, auditService)
 	userService := service.NewUserService(userRepo, auditService)
 
-	// Initialize network discovery services
-	networkService := service.NewNetworkDiscoveryService(secretService, auditService)
-	configExtractionService := service.NewConfigExtractionService(secretService, auditService)
+	// Initialize network discovery services - temporarily disabled
+	// networkService := service.NewNetworkDiscoveryService(secretService, auditService)
+	// configExtractionService := service.NewConfigExtractionService(secretService, auditService)
 
 	// Initialize middleware
 	jwtMiddleware := security.NewJWTMiddleware(authService)
@@ -116,10 +116,10 @@ func main() {
 	authController := controller.NewAuthController(authService)
 	secretController := controller.NewSecretController(secretService, jwtMiddleware)
 	userController := controller.NewUserController(userService, jwtMiddleware)
-	networkController := controller.NewNetworkDiscoveryController(networkService, jwtMiddleware)
+	// networkController := controller.NewNetworkDiscoveryController(networkService, jwtMiddleware)
 
 	// Setup Gin router
-	router := setupRouter(authController, secretController, userController, networkController)
+	router := setupRouter(authController, secretController, userController, nil)
 
 	// Create HTTP server
 	srv := &http.Server{
@@ -241,7 +241,7 @@ func setupRouter(authController *controller.AuthController, secretController *co
 		authController.RegisterRoutes(v1)
 		secretController.RegisterRoutes(v1)
 		userController.RegisterRoutes(v1)
-		networkController.RegisterRoutes(v1)
+		// networkController.RegisterRoutes(v1) - temporarily disabled
 	}
 
 	return router
