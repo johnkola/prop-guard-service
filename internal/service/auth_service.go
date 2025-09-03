@@ -5,9 +5,9 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/bazarbozorg/PropGuard/internal/dto"
-	"github.com/bazarbozorg/PropGuard/internal/entity"
-	"github.com/bazarbozorg/PropGuard/internal/repository"
+	"PropGuard/internal/dto"
+	"PropGuard/internal/entity"
+	"PropGuard/internal/repository"
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )

@@ -3,8 +3,8 @@ package controller
 import (
 	"net/http"
 
-	"github.com/bazarbozorg/PropGuard/internal/dto"
-	"github.com/bazarbozorg/PropGuard/internal/service"
+	"PropGuard/internal/dto"
+	"PropGuard/internal/service"
 	"github.com/gin-gonic/gin"
 )
 

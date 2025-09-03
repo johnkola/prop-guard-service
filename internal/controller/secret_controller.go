@@ -4,9 +4,9 @@ import (
 	"net/http"
 	"strconv"
 
-	"github.com/bazarbozorg/PropGuard/internal/dto"
-	"github.com/bazarbozorg/PropGuard/internal/security"
-	"github.com/bazarbozorg/PropGuard/internal/service"
+	"PropGuard/internal/dto"
+	"PropGuard/internal/security"
+	"PropGuard/internal/service"
 	"github.com/gin-gonic/gin"
 )
 

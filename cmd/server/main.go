@@ -11,12 +11,12 @@ import (
 	"syscall"
 	"time"
 
-	_ "github.com/bazarbozorg/PropGuard/docs"
-	"github.com/bazarbozorg/PropGuard/internal/config"
-	"github.com/bazarbozorg/PropGuard/internal/controller"
-	"github.com/bazarbozorg/PropGuard/internal/repository"
-	"github.com/bazarbozorg/PropGuard/internal/security"
-	"github.com/bazarbozorg/PropGuard/internal/service"
+	_ "PropGuard/docs"
+	"PropGuard/internal/config"
+	"PropGuard/internal/controller"
+	"PropGuard/internal/repository"
+	"PropGuard/internal/security"
+	"PropGuard/internal/service"
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -28,7 +28,7 @@ import (
 // @termsOfService http://swagger.io/terms/
 
 // @contact.name API Support
-// @contact.email support@jvault.io
+// @contact.email support@propguard.io
 
 // @license.name Apache 2.0
 // @license.url http://www.apache.org/licenses/LICENSE-2.0.html
@@ -119,7 +119,7 @@ func main() {
 	// networkController := controller.NewNetworkDiscoveryController(networkService, jwtMiddleware)
 
 	// Setup Gin router
-	router := setupRouter(authController, secretController, userController, nil)
+	router := setupRouter(authController, secretController, userController, nil, redisClient)
 
 	// Create HTTP server
 	srv := &http.Server{
@@ -145,7 +145,7 @@ func main() {
 	log.Println("Shutting down server...")
 
 	// Graceful shutdown with timeout
-	ctx, cancel = context.WithTimeout(context.Background(), 10*time.Second)
+	ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
 	defer cancel()
 	if err := srv.Shutdown(ctx); err != nil {
 		log.Printf("Server forced to shutdown: %v", err)
@@ -154,7 +154,7 @@ func main() {
 	log.Println("Server shutdown complete")
 }
 
-func setupRouter(authController *controller.AuthController, secretController *controller.SecretController, userController *controller.UserController, networkController *controller.NetworkDiscoveryController) *gin.Engine {
+func setupRouter(authController *controller.AuthController, secretController *controller.SecretController, userController *controller.UserController, networkController *controller.NetworkDiscoveryController, redisClient *repository.RedisClient) *gin.Engine {
 	// Set Gin mode based on environment
 	if os.Getenv("GIN_MODE") == "" {
 		gin.SetMode(gin.ReleaseMode)
@@ -167,12 +167,32 @@ func setupRouter(authController *controller.AuthController, secretController *co
 	router.Use(gin.Logger())
 	router.Use(corsMiddleware())
 
-	// Health check endpoint
+	// Enhanced health check endpoint for Docker deployment
 	router.GET("/health", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{
-			"status": "healthy",
-			"time":   time.Now().Unix(),
-		})
+		healthStatus := gin.H{
+			"status":      "healthy",
+			"time":        time.Now().Unix(),
+			"environment": os.Getenv("GIN_MODE"),
+			"docker":      os.Getenv("REDIS_HOST") != "",
+		}
+
+		// Test Redis connectivity
+		if redisClient != nil {
+			if err := redisClient.Ping(); err != nil {
+				healthStatus["redis"] = "unhealthy"
+				healthStatus["redis_error"] = err.Error()
+				c.JSON(http.StatusServiceUnavailable, healthStatus)
+				return
+			}
+			healthStatus["redis"] = "healthy"
+			healthStatus["redis_host"] = os.Getenv("REDIS_HOST")
+		}
+
+		// Add service info
+		healthStatus["service"] = "PropGuard API"
+		healthStatus["version"] = "1.0"
+
+		c.JSON(http.StatusOK, healthStatus)
 	})
 
 	// Serve static files for React dashboard

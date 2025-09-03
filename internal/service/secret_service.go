@@ -6,9 +6,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/bazarbozorg/PropGuard/internal/dto"
-	"github.com/bazarbozorg/PropGuard/internal/entity"
-	"github.com/bazarbozorg/PropGuard/internal/repository"
+	"PropGuard/internal/dto"
+	"PropGuard/internal/entity"
+	"PropGuard/internal/repository"
 	"github.com/google/uuid"
 )
 

@@ -4,7 +4,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/bazarbozorg/PropGuard/internal/service"
+	"PropGuard/internal/service"
 	"github.com/gin-gonic/gin"
 )
 

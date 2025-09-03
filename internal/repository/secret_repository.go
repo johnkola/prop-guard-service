@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/bazarbozorg/PropGuard/internal/entity"
+	"PropGuard/internal/entity"
 	"github.com/google/uuid"
 	"go.mongodb.org/mongo-driver/bson"
 	"go.mongodb.org/mongo-driver/mongo"

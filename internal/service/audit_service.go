@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"time"
 
-	"github.com/bazarbozorg/PropGuard/internal/entity"
-	"github.com/bazarbozorg/PropGuard/internal/repository"
+	"PropGuard/internal/entity"
+	"PropGuard/internal/repository"
 )
 
 type AuditService interface {

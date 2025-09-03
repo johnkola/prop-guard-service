@@ -1,4 +1,4 @@
-module github.com/bazarbozorg/PropGuard
+module PropGuard
 
 go 1.23.0
 
