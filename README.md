@@ -1,6 +1,8 @@
 # PropGuard Service - Decision Center
 
-> **📋 CENTRAL DECISION HUB**: This README serves as the single source of truth for all project decisions, architecture choices, and development direction. All major decisions should be documented here before implementation.
+> **🔒 SEALED DOCUMENTATION**: This README is currently SEALED for stability. All major architectural decisions have been finalized. Contact project maintainer before making changes.
+
+> **📋 CENTRAL DECISION HUB**: This README serves as the single source of truth for all project decisions, architecture choices, and development direction.
 
 A secure secrets management and configuration service built with Go, providing enterprise-grade security for sensitive data management, environment parameter control, and network discovery capabilities.
 
