@@ -105,9 +105,7 @@ func main() {
 	secretService := service.NewSecretService(secretRepo, userRepo, encryptionService, auditService)
 	userService := service.NewUserService(userRepo, auditService)
 
-	// Initialize network discovery services - temporarily disabled
-	// networkService := service.NewNetworkDiscoveryService(secretService, auditService)
-	// configExtractionService := service.NewConfigExtractionService(secretService, auditService)
+	// Network discovery removed per ADR-005 (security risks)
 
 	// Initialize middleware
 	jwtMiddleware := security.NewJWTMiddleware(authService)
@@ -116,10 +114,10 @@ func main() {
 	authController := controller.NewAuthController(authService)
 	secretController := controller.NewSecretController(secretService, jwtMiddleware)
 	userController := controller.NewUserController(userService, jwtMiddleware)
-	// networkController := controller.NewNetworkDiscoveryController(networkService, jwtMiddleware)
+	// Network discovery controller removed per ADR-005
 
 	// Setup Gin router
-	router := setupRouter(authController, secretController, userController, nil, redisClient)
+	router := setupRouter(authController, secretController, userController, redisClient)
 
 	// Create HTTP server
 	srv := &http.Server{
@@ -154,7 +152,7 @@ func main() {
 	log.Println("Server shutdown complete")
 }
 
-func setupRouter(authController *controller.AuthController, secretController *controller.SecretController, userController *controller.UserController, networkController *controller.NetworkDiscoveryController, redisClient *repository.RedisClient) *gin.Engine {
+func setupRouter(authController *controller.AuthController, secretController *controller.SecretController, userController *controller.UserController, redisClient *repository.RedisClient) *gin.Engine {
 	// Set Gin mode based on environment
 	if os.Getenv("GIN_MODE") == "" {
 		gin.SetMode(gin.ReleaseMode)
@@ -261,7 +259,7 @@ func setupRouter(authController *controller.AuthController, secretController *co
 		authController.RegisterRoutes(v1)
 		secretController.RegisterRoutes(v1)
 		userController.RegisterRoutes(v1)
-		// networkController.RegisterRoutes(v1) - temporarily disabled
+		// Network discovery routes removed per ADR-005
 	}
 
 	return router

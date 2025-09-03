@@ -31,6 +31,14 @@ test: ## Run tests
 test-coverage: ## Run tests with coverage
 	$(GO) test -v -coverprofile=coverage.out ./...
 	$(GO) tool cover -html=coverage.out -o coverage.html
+	@echo "Coverage report generated: coverage.html"
+	@$(GO) tool cover -func=coverage.out | grep total
+
+test-short: ## Run tests without integration tests
+	$(GO) test -v -short ./...
+
+test-integration: ## Run integration tests only
+	$(GO) test -v -run Integration ./...
 
 clean: ## Clean build artifacts
 	rm -rf bin/

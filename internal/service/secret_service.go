@@ -21,15 +21,15 @@ type SecretService interface {
 }
 
 type secretService struct {
-	secretRepo        repository.SecretRepository
-	userRepo          repository.UserRepository
+	secretRepo        *repository.RedisSecretRepository
+	userRepo          *repository.RedisUserRepository
 	encryptionService EncryptionService
 	auditService      AuditService
 }
 
 func NewSecretService(
-	secretRepo repository.SecretRepository,
-	userRepo repository.UserRepository,
+	secretRepo *repository.RedisSecretRepository,
+	userRepo *repository.RedisUserRepository,
 	encryptionService EncryptionService,
 	auditService AuditService,
 ) SecretService {

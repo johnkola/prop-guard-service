@@ -19,10 +19,10 @@ type AuditService interface {
 }
 
 type auditService struct {
-	auditRepo repository.AuditRepository
+	auditRepo *repository.RedisAuditRepository
 }
 
-func NewAuditService(auditRepo repository.AuditRepository) AuditService {
+func NewAuditService(auditRepo *repository.RedisAuditRepository) AuditService {
 	return &auditService{
 		auditRepo: auditRepo,
 	}

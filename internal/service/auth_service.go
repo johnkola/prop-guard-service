@@ -26,14 +26,14 @@ type Claims struct {
 }
 
 type authService struct {
-	userRepo     repository.UserRepository
+	userRepo     *repository.RedisUserRepository
 	auditService AuditService
 	jwtSecret    []byte
 	jwtExpiry    time.Duration
 }
 
 func NewAuthService(
-	userRepo repository.UserRepository,
+	userRepo *repository.RedisUserRepository,
 	auditService AuditService,
 	jwtSecret string,
 	jwtExpiryHours int,
