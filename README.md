@@ -27,22 +27,31 @@ A secure secrets management and configuration service built with Go, providing e
 
 ### Core Capabilities
 - **🔐 Secure Secret Storage**: AES-256-GCM encryption for all secrets with master key protection
-- **🔑 JWT Authentication**: Stateless authentication with role-based access control (RBAC)
+- **🔑 Multi-Authentication**: JWT tokens for users + API keys for services with fine-grained permissions
+- **👥 Role-Based Access Control**: Comprehensive RBAC with predefined roles and custom permissions
+- **🏢 Multi-Tenancy**: Team/workspace isolation with billing plans and usage limits
 - **💾 Redis Backend**: High-performance in-memory data structure store with optional persistence
 - **📝 Comprehensive Audit Logging**: Complete audit trail for all operations with configurable retention
+- **📊 Access Analytics**: Track when secrets/params are accessed, by which services, and usage patterns
 - **🌐 RESTful API**: Clean REST API with Swagger/OpenAPI documentation
 - **🐳 Docker Ready**: Multi-container deployment with Docker Compose
-- **🔍 Network Discovery**: Automated network service discovery and configuration extraction
 - **⚙️ Environment Parameters**: Centralized environment configuration management with policy enforcement
-- **👥 User Management**: Multi-user support with role-based permissions
+- **🔄 Batch Keys API**: Allow services to request multiple secrets/params with missing keys tracking
+- **🔔 Admin Notifications**: Automatic alerts when services request non-existent keys
+- **⏰ Scheduled Rotation**: Automatic secret rotation on configurable schedules with notifications
 
 ### Security Features
 - **Encryption at Rest**: All secrets encrypted using AES-256-GCM
-- **JWT Token Authentication**: Secure, stateless authentication
-- **Role-Based Access Control**: Fine-grained permission management
+- **HTTPS Everywhere**: All communication encrypted in transit with TLS 1.2+
+- **Dual Authentication**: JWT tokens for users + API keys for services
+- **Advanced RBAC**: 5 predefined roles (Admin, Manager, User, ReadOnly, Service) with 30+ granular permissions
+- **Team Isolation**: Multi-tenant architecture with workspace separation
+- **API Key Security**: Scoped permissions, IP whitelisting, expiration, usage tracking
 - **Audit Trail**: Complete operation logging with tamper protection
-- **Secret Rotation History**: Track and manage secret version history
+- **Secret Rotation**: Manual and scheduled secret rotation with automated notifications
 - **Policy Enforcement**: Define and enforce secret/parameter policies
+- **Automatic Lockout**: Account locking after failed login attempts
+- **MFA Support**: Multi-factor authentication for enhanced security
 
 ## 📋 Prerequisites
 
@@ -75,10 +84,55 @@ A secure secrets management and configuration service built with Go, providing e
    ```
 
 The services will be available at:
-- **Backend API**: `http://localhost:8080`
-- **Swagger Docs**: `http://localhost:8080/swagger/index.html` 
-- **Frontend Dashboard**: `http://localhost:3000` (Next.js + React + DaisyUI)
+- **Backend API**: `https://localhost:8080` (HTTPS enforced)
+- **Swagger Docs**: `https://localhost:8080/swagger/index.html` 
+- **Frontend Dashboard**: `https://localhost:3000` (Next.js + React + DaisyUI)
 - **Redis**: `localhost:6379`
+
+**⚠️ Security Note**: PropGuard enforces HTTPS for all API communication. HTTP requests are automatically redirected to HTTPS.
+
+### 🌱 First-Run Bootstrap
+
+PropGuard automatically initializes itself on first startup with:
+
+1. **Default Admin User Creation**:
+   - **Username**: `admin`
+   - **Password**: `admin123` (⚠️ **CHANGE IMMEDIATELY**)
+   - **Email**: `admin@propguard.local`
+   - **Role**: Full Administrator
+
+2. **System Roles Seeding**:
+   - Administrator (all permissions)
+   - Manager (user/secret management)
+   - User (basic access)
+   - ReadOnly (view-only access)
+   - Service (API access only)
+
+3. **First Login Security**:
+   - System forces password change on first admin login
+   - MFA setup prompt (if enabled)
+   - Default team/workspace creation
+
+**Override Default Credentials** (recommended for production):
+```bash
+# Set environment variables before first startup
+export PROPGUARD_ADMIN_USERNAME="youradmin"
+export PROPGUARD_ADMIN_PASSWORD="your-secure-password"
+export PROPGUARD_ADMIN_EMAIL="admin@yourcompany.com"
+export PROPGUARD_SKIP_PASSWORD_PROMPT="false"  # Still prompt for change
+```
+
+**Bootstrap Process**:
+```bash
+# Fresh installation logs:
+🌱 First run detected - starting bootstrap process
+✓ System roles created (5 roles)
+✓ Default admin user created
+✓ Default team workspace initialized
+✓ System configuration loaded
+✅ PropGuard ready - Login with admin credentials
+🔐 IMPORTANT: Change default password immediately!
+```
 
 ### Local Development Setup
 
@@ -160,6 +214,11 @@ The React dashboard uses Next.js 15 with modern tooling:
 | `AUDIT_RETENTION_DAYS` | Audit log retention period | `90` | No |
 | **CORS Configuration** |
 | `CORS_ALLOWED_ORIGINS` | Comma-separated allowed origins | `http://localhost:3000,http://localhost:8080` | No |
+| **Bootstrap Configuration** |
+| `PROPGUARD_ADMIN_USERNAME` | Default admin username | `admin` | No |
+| `PROPGUARD_ADMIN_PASSWORD` | Default admin password | `admin123` | No |
+| `PROPGUARD_ADMIN_EMAIL` | Default admin email | `admin@propguard.local` | No |
+| `PROPGUARD_SKIP_PASSWORD_PROMPT` | Skip password change prompt | `false` | No |
 
 ### Redis Persistence Configuration
 
@@ -248,6 +307,22 @@ Content-Type: application/json
 ```bash
 GET /api/v1/secrets/{path}
 Authorization: Bearer <token>
+
+# Response includes access tracking
+{
+  "path": "/prod/database_url",
+  "data": {
+    "url": "postgres://..."
+  },
+  "metadata": {
+    "description": "Production database connection",
+    "last_accessed_at": "2024-09-04T15:30:00Z",
+    "last_accessed_by": "service:my-web-app",
+    "access_count": 1247,
+    "created_at": "2024-08-01T10:00:00Z",
+    "updated_at": "2024-09-01T12:30:00Z"
+  }
+}
 ```
 
 #### Update Secret
@@ -269,10 +344,91 @@ DELETE /api/v1/secrets/{path}
 Authorization: Bearer <token>
 ```
 
+#### Rotate Secret
+```bash
+POST /api/v1/secrets/{path}/rotate
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "new_value": "new-secret-value",
+  "rotation_reason": "scheduled_rotation",
+  "notify_services": true
+}
+```
+
+#### Schedule Secret Rotation
+```bash
+POST /api/v1/secrets/{path}/schedule-rotation
+Authorization: Bearer <token>
+Content-Type: application/json
+
+{
+  "rotation_interval_days": 90,
+  "auto_generate": true,
+  "notify_before_days": 7,
+  "notify_services": true,
+  "next_rotation_date": "2024-12-01T00:00:00Z"
+}
+```
+
+#### Get Rotation Schedule
+```bash
+GET /api/v1/secrets/{path}/rotation-schedule
+Authorization: Bearer <token>
+```
+
+#### Cancel Scheduled Rotation
+```bash
+DELETE /api/v1/secrets/{path}/rotation-schedule
+Authorization: Bearer <token>
+```
+
 #### List Secrets
 ```bash
 GET /api/v1/secrets?limit=20&offset=0
 Authorization: Bearer <token>
+```
+
+#### Get Secret Rotation History
+```bash
+GET /api/v1/secrets/{path}/history
+Authorization: Bearer <token>
+```
+
+#### Get Secret Access Analytics
+```bash
+GET /api/v1/secrets/{path}/analytics
+Authorization: Bearer <token>
+
+# Response includes detailed access patterns
+{
+  "path": "/prod/database_url",
+  "total_accesses": 1247,
+  "unique_services": 3,
+  "last_accessed_at": "2024-09-04T15:30:00Z",
+  "last_accessed_by": "service:my-web-app",
+  "access_frequency": {
+    "last_24h": 45,
+    "last_7d": 312,
+    "last_30d": 1247
+  },
+  "top_services": [
+    {"service": "user-service", "access_count": 450},
+    {"service": "api-gateway", "access_count": 380},
+    {"service": "background-worker", "access_count": 300},
+    {"service": "cache-service", "access_count": 117}
+  ],
+  "first_accessed_at": "2024-08-01T10:15:00Z"
+}
+```
+
+#### List Unused Secrets
+```bash
+GET /api/v1/admin/secrets/unused?days=30
+Authorization: Bearer <token>
+
+# Returns secrets not accessed in the last 30 days
 ```
 
 ### User Management Endpoints
@@ -317,13 +473,46 @@ The service includes support for centralized environment parameter management wi
 - Environment-specific parameter sets
 - Parameter change tracking
 
-### Network Discovery (Coming Soon)
+### Batch Keys API
 
-Network discovery capabilities for automated service detection and configuration extraction:
-- Service discovery across network segments
-- Automatic configuration extraction
-- Security credential detection
-- Service dependency mapping
+Efficient API for external services to request multiple secrets and parameters:
+- **POST /api/v1/batch-keys** - Request multiple keys in a single call
+- **Service Access Tracking** - Log which service accessed which keys (service_name is optional)
+- **Missing Value Tracking** - Automatically tracks requested keys that don't have values
+- **Admin Notifications** - Creates notifications for admins to review missing values
+- **Service Authentication** - Uses API keys for secure service-to-service communication
+
+```bash
+# Example batch request (HTTPS only)
+curl -X POST https://propguard.company.com/api/v1/batch-keys \
+  -H "X-API-Key: pgs_your-service-api-key" \
+  -H "Content-Type: application/json" \
+  -d '{
+    "service_name": "user-service",
+    "environment": "production",
+    "keys": [
+      "database_url",
+      "redis_password", 
+      "stripe_api_key",
+      "missing_key"
+    ]
+  }'
+
+# Response includes found keys and tracks missing ones
+{
+  "service_name": "user-service",
+  "environment": "production",
+  "keys": {
+    "database_url": "postgres://...",
+    "redis_password": "secret123",
+    "stripe_api_key": "sk_..."
+  },
+  "missing_values": ["missing_key"],
+  "request_id": "req_1234567890",
+  "access_logged": true,
+  "timestamp": "2024-09-04T15:30:00Z"
+}
+```
 
 ## 🏗️ Architecture
 
@@ -338,9 +527,17 @@ prop-guard-service/
 │   │   ├── auth_controller.go
 │   │   ├── secret_controller.go
 │   │   ├── user_controller.go
-│   │   └── network_discovery_controller.go
+│   │   ├── role_controller.go
+│   │   ├── team_controller.go
+│   │   ├── api_key_controller.go
+│   │   └── batch_keys_controller.go
 │   ├── dto/             # Data transfer objects
 │   ├── entity/          # Domain models
+│   │   ├── vault_user.go      # Enhanced with RBAC
+│   │   ├── role.go            # RBAC roles and permissions
+│   │   ├── team.go            # Multi-tenancy teams
+│   │   ├── api_key.go         # Service authentication
+│   │   └── service_discovery.go # Missing keys tracking
 │   ├── repository/      # Data access layer (Redis)
 │   ├── security/        # JWT middleware & authentication
 │   ├── service/         # Business logic layer
@@ -357,12 +554,14 @@ prop-guard-service/
 ### Service Layer Architecture
 
 - **AuthService**: Handles authentication, JWT token generation and validation
-- **SecretService**: Manages secret encryption, storage, and retrieval
+- **SecretService**: Manages secret encryption, storage, retrieval, and rotation
 - **UserService**: User management and role-based access control
 - **EncryptionService**: AES-256-GCM encryption/decryption operations
 - **AuditService**: Audit logging and compliance tracking
-- **NetworkDiscoveryService**: Network scanning and service discovery
-- **ConfigExtractionService**: Configuration parameter extraction
+- **AnalyticsService**: Track secret/parameter access patterns and usage statistics
+- **RotationService**: Secret rotation scheduling, automation, and history management
+- **NotificationService**: Admin notifications for missing values and system events
+- **BatchKeysService**: Handle service requests for multiple configuration values
 
 ## 🚀 Development
 
@@ -424,7 +623,17 @@ make test-coverage
 
 ### Security Considerations
 
-1. **Generate secure secrets**
+1. **HTTPS Configuration (Required)**
+   ```bash
+   # PropGuard REQUIRES HTTPS in production
+   # Configure TLS certificate (Let's Encrypt recommended)
+   export TLS_CERT_FILE="/path/to/cert.pem"
+   export TLS_KEY_FILE="/path/to/key.pem"
+   export FORCE_HTTPS="true"
+   export HSTS_ENABLED="true"
+   ```
+
+2. **Generate secure secrets**
    ```bash
    # Generate JWT secret
    openssl rand -base64 32
@@ -433,7 +642,7 @@ make test-coverage
    openssl rand -base64 32
    ```
 
-2. **Configure production environment**
+3. **Configure production environment**
    ```bash
    export JWT_SECRET="your-secure-jwt-secret"
    export VAULT_MASTER_KEY="your-32-byte-master-key"
@@ -441,12 +650,15 @@ make test-coverage
    export GIN_MODE="release"
    ```
 
-3. **Enable Redis persistence**
+4. **Enable Redis persistence**
    - Configure RDB snapshots for point-in-time recovery
    - Enable AOF for durability
    - Set up regular backups
 
-4. **Network Security**
+5. **Network Security**
+   - **HTTPS/TLS 1.2+**: All API communication encrypted
+   - **HTTP → HTTPS redirect**: Automatic redirect for security
+   - **HSTS headers**: Prevent protocol downgrade attacks
    - Use TLS for Redis connections in production
    - Configure firewall rules to restrict access
    - Enable CORS only for trusted origins
@@ -929,6 +1141,83 @@ internal/
 
 ---
 
+### ADR-007: CI/CD Pipeline Technology
+**Date**: 2025-09-04  
+**Status**: ✅ Decided  
+**Decision**: GitHub Actions for CI/CD pipeline
+
+**Context**: Need automated testing, building, and deployment pipeline for PropGuard
+- **Option A**: GitHub Actions ✅ **SELECTED**
+- **Option B**: GitLab CI/CD
+- **Option C**: Jenkins
+- **Option D**: CircleCI
+
+**Decision Rationale**:
+- **Native GitHub Integration**: Seamless integration with repository, issues, and PRs
+- **Free for Public Repos**: Generous free tier (2000 minutes/month for private)
+- **Matrix Builds**: Easy multi-version Go testing (1.21, 1.22, 1.23)
+- **Docker Support**: Built-in Docker and Docker Compose actions
+- **Security Scanning**: Native Dependabot, CodeQL, and secret scanning
+- **Marketplace**: Extensive marketplace of pre-built actions
+- **Infrastructure as Code**: YAML-based configuration in repository
+
+**Implementation Strategy**:
+```yaml
+# Workflow structure
+.github/workflows/
+├── ci.yml           # Continuous Integration (test, build, lint)
+├── cd.yml           # Continuous Deployment (Docker, releases)
+├── security.yml     # Security scanning (CodeQL, Trivy, gosec)
+└── release.yml      # Automated releases with changelogs
+```
+
+**Pipeline Stages**:
+1. **CI Pipeline** (On every push/PR):
+   - Run tests with coverage
+   - Build binaries for multiple platforms
+   - Run linters (golangci-lint)
+   - Check code formatting
+   - Validate Swagger documentation
+
+2. **Security Pipeline** (Daily + on PR):
+   - CodeQL analysis for Go
+   - Dependency vulnerability scanning
+   - Container image scanning with Trivy
+   - Secret detection with TruffleHog
+   - SAST with gosec
+
+3. **CD Pipeline** (On main branch):
+   - Build and push Docker images
+   - Multi-arch builds (amd64, arm64)
+   - Tag with version and latest
+   - Deploy to staging environment
+   - Run smoke tests
+
+4. **Release Pipeline** (On version tags):
+   - Create GitHub releases
+   - Generate changelogs
+   - Build release binaries
+   - Push to Docker Hub
+   - Update documentation
+
+**Quality Gates**:
+- Minimum 80% code coverage
+- All tests must pass
+- No critical security vulnerabilities
+- Code must be formatted with gofmt
+- No linting errors from golangci-lint
+
+**Consequences**:
+- ✅ **Zero Infrastructure Cost**: No self-hosted runners needed
+- ✅ **Fast Feedback**: Parallel jobs, matrix builds
+- ✅ **Security First**: Built-in security scanning tools
+- ✅ **Easy Secrets Management**: GitHub Secrets for sensitive data
+- ✅ **PR Integration**: Automatic checks on pull requests
+- ⚠️ **Vendor Lock-in**: Tied to GitHub platform
+- ⚠️ **Limited Customization**: Less flexible than self-hosted solutions
+
+---
+
 ## 🏛️ Project Governance
 
 ### Decision Authority Matrix
@@ -954,7 +1243,7 @@ internal/
 
 | Decision | Deadline | Priority | Status |
 |----------|----------|----------|--------|
-| CI/CD Pipeline Choice (ADR-007) | 2024-09-20 | Medium | Needs proposal |
+| ~~CI/CD Pipeline Choice (ADR-007)~~ | ~~2024-09-20~~ | ~~Medium~~ | ✅ **Decided: GitHub Actions** |
 | Rate Limiting Strategy (ADR-008) | 2024-09-25 | Medium | Needs proposal |
 | Environment Parameters Storage (ADR-009) | 2024-09-30 | Medium | Needs proposal |
 | Secret Versioning Strategy (ADR-010) | 2024-10-05 | Low | Needs proposal |
