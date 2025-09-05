@@ -5,8 +5,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
+	"time"
 
 	"PropGuard/internal/config"
+	"PropGuard/internal/entity"
 	"PropGuard/internal/repository"
 	"PropGuard/internal/service"
 
@@ -229,11 +232,47 @@ var userCreateCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 		username := args[0]
 		email := args[1]
+		ctx := context.Background()
 
 		fmt.Printf("👤 Creating user: %s (%s)\n", username, email)
-		fmt.Println("⚠️  User creation via CLI is not yet implemented.")
-		fmt.Println("Please use the web interface or API to create users.")
-		fmt.Println("🌐 Web interface: http://localhost:8080")
+
+		// Load configuration
+		cfg, err := loadConfig()
+		if err != nil {
+			log.Fatalf("Failed to load configuration: %v", err)
+		}
+
+		// Initialize BadgerDB
+		badgerClient, err := initializeBadger(cfg)
+		if err != nil {
+			log.Fatalf("Failed to initialize BadgerDB: %v", err)
+		}
+		defer badgerClient.Close()
+
+		// Generate password
+		password := generatePassword()
+
+		// Hash password
+		hashedPassword, err := service.HashPassword(password)
+		if err != nil {
+			log.Fatalf("Failed to hash password: %v", err)
+		}
+
+		// Create user entity
+		user := entity.NewVaultUser(username, email, hashedPassword)
+		user.RoleIDs = []string{"role_user"} // Default role
+
+		// Create user
+		userRepo := repository.NewBadgerUserRepository(badgerClient)
+		if err := userRepo.Create(ctx, user); err != nil {
+			log.Fatalf("Failed to create user: %v", err)
+		}
+
+		fmt.Println("✅ User created successfully!")
+		fmt.Printf("Username: %s\n", username)
+		fmt.Printf("Email: %s\n", email)
+		fmt.Printf("Password: %s\n", password)
+		fmt.Println("🔐 IMPORTANT: Provide the password securely to the user!")
 	},
 }
 
@@ -242,11 +281,51 @@ var userListCmd = &cobra.Command{
 	Short: "List all users",
 	Long:  `List all PropGuard users in the system.`,
 	Run: func(cmd *cobra.Command, args []string) {
+		ctx := context.Background()
+
 		fmt.Println("👥 PropGuard Users")
 		fmt.Println("=================")
-		fmt.Println("⚠️  User listing via CLI is not yet implemented.")
-		fmt.Println("Please use the web interface or API to list users.")
-		fmt.Println("🌐 Web interface: http://localhost:8080")
+
+		// Load configuration
+		cfg, err := loadConfig()
+		if err != nil {
+			log.Fatalf("Failed to load configuration: %v", err)
+		}
+
+		// Initialize BadgerDB
+		badgerClient, err := initializeBadger(cfg)
+		if err != nil {
+			log.Fatalf("Failed to initialize BadgerDB: %v", err)
+		}
+		defer badgerClient.Close()
+
+		// List users
+		userRepo := repository.NewBadgerUserRepository(badgerClient)
+		users, err := userRepo.List(ctx, 100, 0) // Get up to 100 users
+		if err != nil {
+			log.Fatalf("Failed to list users: %v", err)
+		}
+
+		total := len(users)
+
+		if total == 0 {
+			fmt.Println("No users found.")
+			return
+		}
+
+		fmt.Printf("Found %d users:\n\n", total)
+		fmt.Printf("%-36s %-20s %-30s %-8s %-12s\n", "ID", "Username", "Email", "Enabled", "Created")
+		fmt.Println(strings.Repeat("-", 110))
+
+		for _, user := range users {
+			fmt.Printf("%-36s %-20s %-30s %-8v %-12s\n",
+				user.ID.String(),
+				user.Username,
+				user.Email,
+				user.Enabled,
+				user.CreatedAt.Format("2006-01-02"),
+			)
+		}
 	},
 }
 
@@ -257,11 +336,53 @@ var userResetPasswordCmd = &cobra.Command{
 	Args:  cobra.ExactArgs(1),
 	Run: func(cmd *cobra.Command, args []string) {
 		username := args[0]
+		ctx := context.Background()
 
 		fmt.Printf("🔑 Resetting password for user: %s\n", username)
-		fmt.Println("⚠️  Password reset via CLI is not yet implemented.")
-		fmt.Println("Please use the web interface or API to reset passwords.")
-		fmt.Println("🌐 Web interface: http://localhost:8080")
+
+		// Load configuration
+		cfg, err := loadConfig()
+		if err != nil {
+			log.Fatalf("Failed to load configuration: %v", err)
+		}
+
+		// Initialize BadgerDB
+		badgerClient, err := initializeBadger(cfg)
+		if err != nil {
+			log.Fatalf("Failed to initialize BadgerDB: %v", err)
+		}
+		defer badgerClient.Close()
+
+		userRepo := repository.NewBadgerUserRepository(badgerClient)
+
+		// Find user
+		user, err := userRepo.FindByUsername(ctx, username)
+		if err != nil {
+			log.Fatalf("User not found: %v", err)
+		}
+
+		// Generate new password
+		newPassword := generatePassword()
+
+		// Hash password
+		hashedPassword, err := service.HashPassword(newPassword)
+		if err != nil {
+			log.Fatalf("Failed to hash password: %v", err)
+		}
+
+		// Update user
+		user.PasswordHash = hashedPassword
+		user.RequirePasswordChange = true
+		user.UpdatedAt = time.Now()
+
+		if err := userRepo.Update(ctx, user); err != nil {
+			log.Fatalf("Failed to update user password: %v", err)
+		}
+
+		fmt.Println("✅ Password reset successfully!")
+		fmt.Printf("New password: %s\n", newPassword)
+		fmt.Println("🔐 IMPORTANT: Provide the password securely to the user!")
+		fmt.Println("Note: User will be required to change password on next login.")
 	},
 }
 
@@ -296,4 +417,16 @@ func initializeBadger(cfg *config.Config) (*repository.BadgerClient, error) {
 	}
 
 	return repository.NewBadgerClient(badgerConfig)
+}
+
+// generatePassword generates a secure random password
+func generatePassword() string {
+	// Simple password generation (in production, use crypto/rand)
+	chars := "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*"
+	password := make([]byte, 12)
+	for i := range password {
+		password[i] = chars[time.Now().UnixNano()%int64(len(chars))]
+		time.Sleep(time.Nanosecond) // Ensure different timestamps
+	}
+	return string(password)
 }

@@ -154,10 +154,9 @@ func TestBootstrapService_GetBootstrapStatus(t *testing.T) {
 }
 
 func TestBootstrapService_ConfigValidation(t *testing.T) {
-	badgerClient := setupTestBadgerClient(t)
-	defer badgerClient.Close()
-
 	t.Run("Bootstrap with empty admin username", func(t *testing.T) {
+		badgerClient := setupTestBadgerClient(t)
+		defer badgerClient.Close()
 		cfg := &config.Config{
 			Bootstrap: config.BootstrapConfig{
 				AdminUsername: "", // Empty username
@@ -178,6 +177,8 @@ func TestBootstrapService_ConfigValidation(t *testing.T) {
 	})
 
 	t.Run("Bootstrap with custom configuration", func(t *testing.T) {
+		badgerClient := setupTestBadgerClient(t)
+		defer badgerClient.Close()
 		cfg := &config.Config{
 			Bootstrap: config.BootstrapConfig{
 				AdminUsername: "customadmin",

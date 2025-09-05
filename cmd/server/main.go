@@ -14,6 +14,7 @@ import (
 	// _ "PropGuard/docs" // Commented out - docs will be regenerated
 	"PropGuard/internal/config"
 	"PropGuard/internal/controller"
+	"PropGuard/internal/middleware"
 	"PropGuard/internal/repository"
 	"PropGuard/internal/security"
 	"PropGuard/internal/service"
@@ -100,19 +101,30 @@ func main() {
 	secretRepo := repository.NewBadgerSecretRepository(badgerClient)
 	auditRepo := repository.NewBadgerAuditRepository(badgerClient, cfg.Vault.AuditRetentionDays)
 	envParamRepo := repository.NewBadgerEnvParamRepository(badgerClient)
-	// apiKeyRepo := repository.NewBadgerAPIKeyRepository(badgerClient) // Temporarily disabled for Phase 3 completion
+	apiKeyRepo := repository.NewBadgerAPIKeyRepository(badgerClient)
 	roleRepo := repository.NewBadgerRoleRepository(badgerClient)
 	teamRepo := repository.NewBadgerTeamRepository(badgerClient)
+	secretPolicyRepo := repository.NewBadgerSecretPolicyRepository(badgerClient)
 
 	// Initialize services
 	encryptionService := service.NewEncryptionService(cfg.Vault.MasterKey)
 	auditService := service.NewAuditService(auditRepo)
 	authService := service.NewAuthService(userRepo, auditService, cfg.JWT.Secret, cfg.JWT.ExpiryHours)
-	secretService := service.NewSecretService(secretRepo, userRepo, encryptionService, auditService)
+
+	// Initialize monitoring service
+	metricsCollector := service.NewMetricsCollector(badgerClient)
+
+	// Initialize policy services
+	generationService := service.NewSecretGenerationService()
+	policyService := service.NewSecretPolicyService(secretPolicyRepo, secretRepo, generationService, auditService)
+
+	// Initialize secret service with policy enforcement
+	secretService := service.NewSecretServiceWithPolicy(secretRepo, userRepo, encryptionService, auditService, policyService)
+
 	userService := service.NewUserService(userRepo, auditService)
 	teamService := service.NewTeamService(teamRepo, auditService)
 	envParamService := service.NewEnvParamService(envParamRepo, encryptionService, auditService)
-	// apiKeyService := service.NewAPIKeyService(apiKeyRepo, auditService) // Temporarily disabled
+	apiKeyService := service.NewAPIKeyService(apiKeyRepo, userRepo, auditService)
 
 	// Initialize middleware
 	jwtMiddleware := security.NewJWTMiddleware(authService)
@@ -125,10 +137,12 @@ func main() {
 	auditController := controller.NewAuditController(auditRepo, auditService, jwtMiddleware)
 	teamController := controller.NewTeamController(teamService, jwtMiddleware)
 	envParamController := controller.NewEnvParamController(envParamService)
-	// apiKeyController := controller.NewAPIKeyController(apiKeyService, jwtMiddleware) // Temporarily disabled
+	apiKeyController := controller.NewAPIKeyController(apiKeyService, jwtMiddleware)
+	policyController := controller.NewSecretPolicyController(policyService, generationService, jwtMiddleware)
+	monitoringController := controller.NewMonitoringController(metricsCollector, badgerClient, jwtMiddleware)
 
 	// Setup Gin router
-	router := setupRouter(authController, secretController, userController, roleController, auditController, teamController, envParamController, badgerClient)
+	router := setupRouter(authController, secretController, userController, roleController, auditController, teamController, envParamController, apiKeyController, policyController, monitoringController, metricsCollector, badgerClient, cfg)
 
 	// Create HTTP server
 	srv := &http.Server{
@@ -163,7 +177,7 @@ func main() {
 	log.Println("Server shutdown complete")
 }
 
-func setupRouter(authController *controller.AuthController, secretController *controller.SecretController, userController *controller.UserController, roleController *controller.RoleController, auditController *controller.AuditController, teamController *controller.TeamController, envParamController *controller.EnvParamController, badgerClient *repository.BadgerClient) *gin.Engine {
+func setupRouter(authController *controller.AuthController, secretController *controller.SecretController, userController *controller.UserController, roleController *controller.RoleController, auditController *controller.AuditController, teamController *controller.TeamController, envParamController *controller.EnvParamController, apiKeyController *controller.APIKeyController, policyController *controller.SecretPolicyController, monitoringController *controller.MonitoringController, metricsCollector service.MetricsCollector, badgerClient *repository.BadgerClient, cfg *config.Config) *gin.Engine {
 	// Set Gin mode based on environment
 	if os.Getenv("GIN_MODE") == "" {
 		gin.SetMode(gin.ReleaseMode)
@@ -171,9 +185,32 @@ func setupRouter(authController *controller.AuthController, secretController *co
 
 	router := gin.New()
 
-	// Add middleware
+	// Add core middleware
 	router.Use(gin.Recovery())
 	router.Use(gin.Logger())
+
+	// Add monitoring middleware first to capture all requests
+	router.Use(middleware.MonitoringMiddleware(metricsCollector))
+	router.Use(middleware.AuthenticationMonitoringMiddleware(metricsCollector))
+	router.Use(middleware.SecretOperationMonitoringMiddleware(metricsCollector))
+	router.Use(middleware.PerformanceMonitoringMiddleware(metricsCollector))
+	router.Use(middleware.AlertMiddleware(metricsCollector))
+
+	// Add security middleware
+	router.Use(middleware.ProductionSecurityHeadersMiddleware())
+	if os.Getenv("GIN_MODE") == "debug" || os.Getenv("GIN_MODE") == "test" {
+		router.Use(middleware.DevelopmentSecurityHeadersMiddleware())
+	}
+
+	// Add rate limiting middleware
+	rateLimitConfig := middleware.DefaultRateLimitConfig()
+	rateLimitMiddleware := middleware.NewRateLimitMiddleware(rateLimitConfig)
+	router.Use(rateLimitMiddleware.GlobalRateLimit())
+
+	// Add input validation middleware for API endpoints
+	router.Use(middleware.APIValidationMiddleware())
+
+	// Add CORS middleware last
 	router.Use(corsMiddleware())
 
 	// Enhanced health check endpoint
@@ -263,15 +300,27 @@ func setupRouter(authController *controller.AuthController, secretController *co
 	// Swagger documentation
 	router.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
-	// API v1 routes
+	// Monitoring routes (includes both public and protected endpoints)
+	monitoringController.RegisterRoutes(router)
+
+	// API v1 routes with additional rate limiting for authenticated endpoints
 	v1 := router.Group("/api/v1")
+	v1.Use(rateLimitMiddleware.APIRateLimit()) // Additional API-specific rate limiting
 	{
-		authController.RegisterRoutes(v1)
+		// Authentication routes with special rate limiting for login
+		authGroup := v1.Group("/auth")
+		{
+			// Login endpoint with stricter rate limiting
+			authGroup.POST("/login", rateLimitMiddleware.LoginRateLimit(), authController.Login)
+			authGroup.POST("/logout", authController.Logout)
+			authGroup.POST("/refresh", authController.RefreshToken)
+		}
 		secretController.RegisterRoutes(v1)
 		userController.RegisterRoutes(v1)
 		roleController.RegisterRoutes(v1)
 		auditController.RegisterRoutes(v1)
 		teamController.RegisterRoutes(v1)
+		policyController.RegisterRoutes(v1)
 
 		// Environment Parameters routes
 		v1.GET("/env-params", envParamController.ListAllEnvParams)
@@ -284,8 +333,8 @@ func setupRouter(authController *controller.AuthController, secretController *co
 		v1.PUT("/env-params/:environment/:key", envParamController.UpdateEnvParam)
 		v1.DELETE("/env-params/:environment/:key", envParamController.DeleteEnvParam)
 
-		// API Key Management routes - temporarily disabled for Phase 3 completion
-		// apiKeyController.RegisterRoutes(v1)
+		// API Key Management routes
+		apiKeyController.RegisterRoutes(v1)
 	}
 
 	return router

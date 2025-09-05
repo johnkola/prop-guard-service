@@ -212,6 +212,22 @@ func (r *BadgerAPIKeyRepository) GetByUserID(ctx context.Context, userID uuid.UU
 	return userKeys, nil
 }
 
+func (r *BadgerAPIKeyRepository) GetByTeamID(ctx context.Context, teamID string) ([]*entity.APIKey, error) {
+	allKeys, err := r.List(ctx, 10000, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	var teamKeys []*entity.APIKey
+	for _, key := range allKeys {
+		if key.TeamID == teamID {
+			teamKeys = append(teamKeys, key)
+		}
+	}
+
+	return teamKeys, nil
+}
+
 func (r *BadgerAPIKeyRepository) Count(ctx context.Context) (int64, error) {
 	indexData, err := r.client.Get(ctx, apiKeyIndexKey)
 	if err != nil {

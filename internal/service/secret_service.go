@@ -27,6 +27,7 @@ type secretService struct {
 	userRepo          *repository.BadgerUserRepository
 	encryptionService EncryptionService
 	auditService      AuditService
+	policyService     SecretPolicyService // Optional - can be nil
 }
 
 func NewSecretService(
@@ -40,6 +41,23 @@ func NewSecretService(
 		userRepo:          userRepo,
 		encryptionService: encryptionService,
 		auditService:      auditService,
+		policyService:     nil, // Set to nil by default - backward compatibility
+	}
+}
+
+func NewSecretServiceWithPolicy(
+	secretRepo *repository.BadgerSecretRepository,
+	userRepo *repository.BadgerUserRepository,
+	encryptionService EncryptionService,
+	auditService AuditService,
+	policyService SecretPolicyService,
+) SecretService {
+	return &secretService{
+		secretRepo:        secretRepo,
+		userRepo:          userRepo,
+		encryptionService: encryptionService,
+		auditService:      auditService,
+		policyService:     policyService,
 	}
 }
 
@@ -56,6 +74,35 @@ func (s *secretService) CreateSecret(ctx context.Context, path string, request *
 	if existing != nil {
 		s.auditService.LogAction(ctx, username, "CREATE_SECRET", namespace+":"+path, false, "Secret already exists")
 		return nil, fmt.Errorf("secret already exists at path: %s in namespace: %s", path, namespace)
+	}
+
+	// Policy enforcement - validate secret value against policy if available
+	if s.policyService != nil && len(request.Data) > 0 {
+		// Extract the primary secret value for validation
+		var primaryValue string
+		if len(request.Data) == 1 {
+			// Single key-value pair - use the value
+			for _, value := range request.Data {
+				primaryValue = fmt.Sprintf("%v", value)
+				break
+			}
+		} else if value, ok := request.Data["value"]; ok {
+			// Look for a "value" key specifically
+			primaryValue = fmt.Sprintf("%v", value)
+		} else if value, ok := request.Data["password"]; ok {
+			// Look for a "password" key
+			primaryValue = fmt.Sprintf("%v", value)
+		} else if value, ok := request.Data["secret"]; ok {
+			// Look for a "secret" key
+			primaryValue = fmt.Sprintf("%v", value)
+		}
+
+		if primaryValue != "" {
+			if err := s.policyService.ValidateSecretAgainstPolicy(ctx, path, primaryValue); err != nil {
+				s.auditService.LogAction(ctx, username, "CREATE_SECRET", path, false, fmt.Sprintf("Policy validation failed: %v", err))
+				return nil, fmt.Errorf("secret validation failed: %w", err)
+			}
+		}
 	}
 
 	// Serialize data to JSON
@@ -87,6 +134,14 @@ func (s *secretService) CreateSecret(ctx context.Context, path string, request *
 	secret.DataHash = dataHash
 	if request.TTLSeconds != nil {
 		secret.SetTTL(*request.TTLSeconds)
+	}
+
+	// Apply policy enforcement to secret entity (sets metadata, auto-generation, etc.)
+	if s.policyService != nil {
+		if err := s.policyService.EnforceSecretPolicy(ctx, path, secret); err != nil {
+			s.auditService.LogAction(ctx, username, "CREATE_SECRET", path, false, fmt.Sprintf("Policy enforcement failed: %v", err))
+			return nil, fmt.Errorf("policy enforcement failed: %w", err)
+		}
 	}
 
 	// Save to repository

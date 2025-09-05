@@ -45,7 +45,7 @@ func setupTestServices(t *testing.T) *TestServices {
 	// Setup fresh test configuration for each test
 	testConfig := &config.Config{
 		JWT: config.JWTConfig{
-			Secret:      "test-jwt-secret-key-32-bytes-long",
+			Secret:      "test-jwt-secret-exactly-32b", // Must match test_helpers.go
 			ExpiryHours: 24,
 		},
 		Vault: config.VaultConfig{
@@ -62,8 +62,19 @@ func setupTestServices(t *testing.T) *TestServices {
 		},
 	}
 
-	// Initialize fresh BadgerDB client for each test
-	badgerConfig := repository.DefaultBadgerConfig(tmpDir)
+	// Initialize fresh BadgerDB client for each test (using working test config)
+	badgerConfig := repository.BadgerConfig{
+		Dir:                tmpDir,
+		ValueLogFileSize:   1 << 26, // 64MB
+		MemTableSize:       1 << 20, // 1MB
+		BlockCacheSize:     1 << 20, // 1MB
+		IndexCacheSize:     1 << 19, // 512KB
+		NumVersionsToKeep:  1,
+		NumLevelZeroTables: 1,
+		Compression:        false,
+		BaseTableSize:      8 << 20,  // 8MB - prevents batch size issues
+		ValueThreshold:     32 << 10, // 32KB - smaller than batch size
+	}
 	testBadgerClient, err := repository.NewBadgerClient(badgerConfig)
 	require.NoError(t, err)
 
@@ -119,13 +130,13 @@ func TestAuthController_Login_Success(t *testing.T) {
 	router := setupTestRouter()
 	router.POST("/api/v1/auth/login", authController.Login)
 
-	// Use the bootstrapped admin credentials
+	// Test login credentials
 	loginReq := dto.LoginRequest{
 		Username: "admin",
 		Password: "admin123",
 	}
 
-	// Create request
+	// Create HTTP request
 	body, _ := json.Marshal(loginReq)
 	req := httptest.NewRequest(http.MethodPost, "/api/v1/auth/login", bytes.NewBuffer(body))
 	req.Header.Set("Content-Type", "application/json")
@@ -133,6 +144,12 @@ func TestAuthController_Login_Success(t *testing.T) {
 
 	// Execute
 	router.ServeHTTP(w, req)
+
+	// Debug output if failed
+	if w.Code != http.StatusOK {
+		t.Logf("Response body: %s", w.Body.String())
+		t.Logf("Response code: %d", w.Code)
+	}
 
 	// Assert
 	assert.Equal(t, http.StatusOK, w.Code)
@@ -242,7 +259,7 @@ func TestSecretController_CreateSecret_Success(t *testing.T) {
 	require.NoError(t, err)
 	assert.Equal(t, "/test/secret", response.Path)
 	assert.Equal(t, secretReq.Data, response.Data)
-	assert.Greater(t, response.Version, uint64(0))
+	assert.Greater(t, response.Version, int64(0))
 }
 
 func TestUserController_CreateUser_Success(t *testing.T) {

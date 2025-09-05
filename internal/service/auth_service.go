@@ -57,7 +57,7 @@ func (s *authService) Login(ctx context.Context, request *dto.LoginRequest) (*dt
 	}
 
 	// Check if user is active
-	if !user.IsActive() {
+	if !user.Enabled {
 		s.auditService.LogAction(ctx, request.Username, "LOGIN", "", false, "User account is not active")
 		return nil, fmt.Errorf("account is disabled")
 	}
@@ -75,10 +75,17 @@ func (s *authService) Login(ctx context.Context, request *dto.LoginRequest) (*dt
 		return nil, fmt.Errorf("failed to generate token")
 	}
 
-	// Convert roles to strings
-	roles := make([]string, len(user.Roles))
-	for i, role := range user.Roles {
-		roles[i] = string(role)
+	// Convert roles to strings (use new RBAC RoleIDs, fallback to legacy Roles)
+	var roles []string
+	if len(user.RoleIDs) > 0 {
+		roles = make([]string, len(user.RoleIDs))
+		copy(roles, user.RoleIDs)
+	} else {
+		// Fallback to legacy roles for backward compatibility
+		roles = make([]string, len(user.Roles))
+		for i, role := range user.Roles {
+			roles[i] = string(role)
+		}
 	}
 
 	s.auditService.LogAction(ctx, request.Username, "LOGIN", "", true, "Login successful")
@@ -146,20 +153,40 @@ func (s *authService) Logout(tokenString string) {
 func (s *authService) generateToken(user *entity.VaultUser) (string, time.Time, error) {
 	expiresAt := time.Now().Add(s.jwtExpiry)
 
-	// Convert roles to strings and collect permissions
-	roles := make([]string, len(user.Roles))
+	// Convert roles to strings and collect permissions (use new RBAC RoleIDs, fallback to legacy Roles)
+	var roles []string
 	permissionMap := make(map[string]bool)
 
-	for i, roleID := range user.Roles {
-		roles[i] = string(roleID)
+	if len(user.RoleIDs) > 0 {
+		// Use new RBAC system
+		roles = make([]string, len(user.RoleIDs))
+		copy(roles, user.RoleIDs)
 
-		// Get role permissions from predefined system roles
-		for _, systemRole := range entity.GetSystemRoles() {
-			if systemRole.ID == string(roleID) {
-				for _, perm := range systemRole.Permissions {
-					permissionMap[perm] = true
+		for _, roleID := range user.RoleIDs {
+			// Get role permissions from predefined system roles
+			for _, systemRole := range entity.GetSystemRoles() {
+				if systemRole.ID == roleID {
+					for _, perm := range systemRole.Permissions {
+						permissionMap[perm] = true
+					}
+					break
 				}
-				break
+			}
+		}
+	} else {
+		// Fallback to legacy roles
+		roles = make([]string, len(user.Roles))
+		for i, role := range user.Roles {
+			roles[i] = string(role)
+
+			// Get role permissions from predefined system roles
+			for _, systemRole := range entity.GetSystemRoles() {
+				if systemRole.ID == string(role) {
+					for _, perm := range systemRole.Permissions {
+						permissionMap[perm] = true
+					}
+					break
+				}
 			}
 		}
 	}

@@ -21,7 +21,7 @@ type VaultUser struct {
 	VaultID               uuid.UUID              `bson:"vaultId" json:"vaultId"`
 	Username              string                 `bson:"username" json:"username" binding:"required,max=100"`
 	Email                 string                 `bson:"email" json:"email" binding:"required,email"`
-	PasswordHash          string                 `bson:"passwordHash" json:"-" binding:"required,max=255"`
+	PasswordHash          string                 `bson:"passwordHash" json:"passwordHash,omitempty" binding:"required,max=255"`
 	Enabled               bool                   `bson:"enabled" json:"enabled"`
 	AccountNonExpired     bool                   `bson:"accountNonExpired" json:"accountNonExpired"`
 	AccountNonLocked      bool                   `bson:"accountNonLocked" json:"accountNonLocked"`
