@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"PropGuard/internal/service"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -79,6 +80,47 @@ func (m *JWTMiddleware) RequireRole(roles ...string) gin.HandlerFunc {
 		}
 
 		if !hasRole {
+			c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
+			c.Abort()
+			return
+		}
+
+		c.Next()
+	}
+}
+
+// RequirePermission checks if the user has a specific permission
+func (m *JWTMiddleware) RequirePermission(permissions ...string) gin.HandlerFunc {
+	return func(c *gin.Context) {
+		claimsInterface, exists := c.Get(ClaimsContextKey)
+		if !exists {
+			c.JSON(http.StatusForbidden, gin.H{"error": "no claims found"})
+			c.Abort()
+			return
+		}
+
+		claims, ok := claimsInterface.(*service.Claims)
+		if !ok {
+			c.JSON(http.StatusInternalServerError, gin.H{"error": "invalid claims type"})
+			c.Abort()
+			return
+		}
+
+		// Check if user has any of the required permissions
+		hasPermission := false
+		for _, requiredPerm := range permissions {
+			for _, userPerm := range claims.Permissions {
+				if userPerm == requiredPerm {
+					hasPermission = true
+					break
+				}
+			}
+			if hasPermission {
+				break
+			}
+		}
+
+		if !hasPermission {
 			c.JSON(http.StatusForbidden, gin.H{"error": "insufficient permissions"})
 			c.Abort()
 			return

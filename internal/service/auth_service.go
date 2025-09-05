@@ -8,6 +8,7 @@ import (
 	"PropGuard/internal/dto"
 	"PropGuard/internal/entity"
 	"PropGuard/internal/repository"
+
 	"github.com/golang-jwt/jwt/v5"
 	"golang.org/x/crypto/bcrypt"
 )
@@ -20,20 +21,21 @@ type AuthService interface {
 }
 
 type Claims struct {
-	Username string   `json:"username"`
-	Roles    []string `json:"roles"`
+	Username    string   `json:"username"`
+	Roles       []string `json:"roles"`
+	Permissions []string `json:"permissions"`
 	jwt.RegisteredClaims
 }
 
 type authService struct {
-	userRepo     *repository.RedisUserRepository
+	userRepo     *repository.BadgerUserRepository
 	auditService AuditService
 	jwtSecret    []byte
 	jwtExpiry    time.Duration
 }
 
 func NewAuthService(
-	userRepo *repository.RedisUserRepository,
+	userRepo *repository.BadgerUserRepository,
 	auditService AuditService,
 	jwtSecret string,
 	jwtExpiryHours int,
@@ -121,8 +123,9 @@ func (s *authService) RefreshToken(tokenString string) (string, error) {
 
 	// Generate new token with same claims
 	newClaims := &Claims{
-		Username: claims.Username,
-		Roles:    claims.Roles,
+		Username:    claims.Username,
+		Roles:       claims.Roles,
+		Permissions: claims.Permissions,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(time.Now().Add(s.jwtExpiry)),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),
@@ -143,15 +146,34 @@ func (s *authService) Logout(tokenString string) {
 func (s *authService) generateToken(user *entity.VaultUser) (string, time.Time, error) {
 	expiresAt := time.Now().Add(s.jwtExpiry)
 
-	// Convert roles to strings
+	// Convert roles to strings and collect permissions
 	roles := make([]string, len(user.Roles))
-	for i, role := range user.Roles {
-		roles[i] = string(role)
+	permissionMap := make(map[string]bool)
+
+	for i, roleID := range user.Roles {
+		roles[i] = string(roleID)
+
+		// Get role permissions from predefined system roles
+		for _, systemRole := range entity.GetSystemRoles() {
+			if systemRole.ID == string(roleID) {
+				for _, perm := range systemRole.Permissions {
+					permissionMap[perm] = true
+				}
+				break
+			}
+		}
+	}
+
+	// Convert permission map to slice
+	permissions := make([]string, 0, len(permissionMap))
+	for perm := range permissionMap {
+		permissions = append(permissions, perm)
 	}
 
 	claims := &Claims{
-		Username: user.Username,
-		Roles:    roles,
+		Username:    user.Username,
+		Roles:       roles,
+		Permissions: permissions,
 		RegisteredClaims: jwt.RegisteredClaims{
 			ExpiresAt: jwt.NewNumericDate(expiresAt),
 			IssuedAt:  jwt.NewNumericDate(time.Now()),

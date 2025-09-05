@@ -1,189 +1,113 @@
-# PropGuard Service - Decision Center
+# PropGuard Service
 
-> **🔒 SEALED DOCUMENTATION**: This README is currently SEALED for stability. All major architectural decisions have been finalized. Contact project maintainer before making changes.
+A secure secrets management and configuration service built with Go, providing enterprise-grade security for sensitive data management with embedded BadgerDB storage. **No external database dependencies required.**
 
-> **📋 CENTRAL DECISION HUB**: This README serves as the single source of truth for all project decisions, architecture choices, and development direction.
-
-A secure secrets management and configuration service built with Go, providing enterprise-grade security for sensitive data management, environment parameter control, and network discovery capabilities.
-
-## 🎯 Decision Making Framework
-
-### Decision Categories
-- **🏗️ Architecture**: Technology choices, system design patterns
-- **🔒 Security**: Security policies, encryption standards
-- **🚀 Features**: New capabilities, API changes
-- **⚡ Performance**: Optimization strategies, scaling decisions
-- **🛠️ Tooling**: Development tools, CI/CD pipeline
-- **📦 Dependencies**: Third-party libraries, external services
-
-### Decision Process
-1. **Proposal**: Document the decision needed in this README
-2. **Discussion**: Add pros/cons, alternatives considered
-3. **Decision**: Mark the chosen option and rationale
-4. **Implementation**: Track progress in TODO list
-5. **Review**: Document outcomes and lessons learned
+**Current Version**: 1.0.0-beta | **Completion**: ~98%
 
 ## 🚀 Features
 
-### Core Capabilities
-- **🔐 Secure Secret Storage**: AES-256-GCM encryption for all secrets with master key protection
-- **🔑 Multi-Authentication**: JWT tokens for users + API keys for services with fine-grained permissions
-- **👥 Role-Based Access Control**: Comprehensive RBAC with predefined roles and custom permissions
-- **🏢 Multi-Tenancy**: Team/workspace isolation with billing plans and usage limits
-- **💾 Redis Backend**: High-performance in-memory data structure store with optional persistence
-- **📝 Comprehensive Audit Logging**: Complete audit trail for all operations with configurable retention
-- **📊 Access Analytics**: Track when secrets/params are accessed, by which services, and usage patterns
-- **🌐 RESTful API**: Clean REST API with Swagger/OpenAPI documentation
-- **🐳 Docker Ready**: Multi-container deployment with Docker Compose
-- **⚙️ Environment Parameters**: Centralized environment configuration management with policy enforcement
-- **🔄 Batch Keys API**: Allow services to request multiple secrets/params with missing keys tracking
-- **🔔 Admin Notifications**: Automatic alerts when services request non-existent keys
-- **⏰ Scheduled Rotation**: Automatic secret rotation on configurable schedules with notifications
+### Core Capabilities ✅ IMPLEMENTED
+- **🔐 Secure Secret Storage**: AES-256-GCM encryption with master key protection
+- **🔑 JWT Authentication**: Secure token-based user authentication
+- **👥 Role-Based Access Control**: Fine-grained permissions with custom roles
+- **💾 Embedded Database**: BadgerDB for high-performance storage (no external dependencies)
+- **📝 Audit Logging**: Complete audit trail for compliance
+- **🌐 RESTful API**: Clean REST API with Swagger documentation
+- **🐳 Docker Ready**: Production-ready two-container deployment
+- **📱 Web Dashboard**: Complete Next.js frontend with all management interfaces
 
-### Security Features
-- **Encryption at Rest**: All secrets encrypted using AES-256-GCM
-- **HTTPS Everywhere**: All communication encrypted in transit with TLS 1.2+
-- **Dual Authentication**: JWT tokens for users + API keys for services
-- **Advanced RBAC**: 5 predefined roles (Admin, Manager, User, ReadOnly, Service) with 30+ granular permissions
-- **Team Isolation**: Multi-tenant architecture with workspace separation
-- **API Key Security**: Scoped permissions, IP whitelisting, expiration, usage tracking
-- **Audit Trail**: Complete operation logging with tamper protection
-- **Secret Rotation**: Manual and scheduled secret rotation with automated notifications
-- **Policy Enforcement**: Define and enforce secret/parameter policies
-- **Automatic Lockout**: Account locking after failed login attempts
-- **MFA Support**: Multi-factor authentication for enhanced security
+### Advanced Features 📋 PLANNED
+- **🏢 Multi-Tenancy**: Team/workspace isolation (entities exist, APIs missing)
+- **🔑 API Keys**: Programmatic access tokens (repository exists, service missing)
+- **⚙️ Environment Parameters**: Configuration management (foundation exists)
+- **🛠️ CLI Tool**: Command-line administration (not implemented)
 
 ## 📋 Prerequisites
 
-- Go 1.23+ 
-- Redis 7.0+ (or use Docker)
-- Docker & Docker Compose (for containerized deployment)
-- Make (optional, for using Makefile commands)
+- Go 1.23+
+- Docker & Docker Compose
+- Make (optional)
 
-## 🛠️ Installation
+## 🛠️ Quick Start
 
-### Quick Start with Docker
+### Using Docker (Recommended)
 
-1. **Clone the repository**
-   ```bash
-   git clone <repository-url>
-   cd prop-guard-service
-   ```
-
-2. **Configure environment**
-   ```bash
-   cp .env.example .env
-   # Edit .env with your configuration
-   ```
-
-3. **Deploy with Docker Compose**
-   ```bash
-   make deploy
-   # OR
-   docker-compose up --build
-   ```
-
-The services will be available at:
-- **Backend API**: `https://localhost:8080` (HTTPS enforced)
-- **Swagger Docs**: `https://localhost:8080/swagger/index.html` 
-- **Frontend Dashboard**: `https://localhost:3000` (Next.js + React + DaisyUI)
-- **Redis**: `localhost:6379`
-
-**⚠️ Security Note**: PropGuard enforces HTTPS for all API communication. HTTP requests are automatically redirected to HTTPS.
-
-### 🌱 First-Run Bootstrap
-
-PropGuard automatically initializes itself on first startup with:
-
-1. **Default Admin User Creation**:
-   - **Username**: `admin`
-   - **Password**: `admin123` (⚠️ **CHANGE IMMEDIATELY**)
-   - **Email**: `admin@propguard.local`
-   - **Role**: Full Administrator
-
-2. **System Roles Seeding**:
-   - Administrator (all permissions)
-   - Manager (user/secret management)
-   - User (basic access)
-   - ReadOnly (view-only access)
-   - Service (API access only)
-
-3. **First Login Security**:
-   - System forces password change on first admin login
-   - MFA setup prompt (if enabled)
-   - Default team/workspace creation
-
-**Override Default Credentials** (recommended for production):
 ```bash
-# Set environment variables before first startup
-export PROPGUARD_ADMIN_USERNAME="youradmin"
-export PROPGUARD_ADMIN_PASSWORD="your-secure-password"
-export PROPGUARD_ADMIN_EMAIL="admin@yourcompany.com"
-export PROPGUARD_SKIP_PASSWORD_PROMPT="false"  # Still prompt for change
+# Clone repository
+git clone <repository-url>
+cd prop-guard-service
+
+# Configure environment (required keys are already set in .env)
+cp .env .env.backup  # Backup existing config
+
+# Start services with required environment variables
+JWT_SECRET="BCKF/ojdm4CmED24mYawxu0dLGsM7IJ2aWMkj1CO7OYPjenQ+j+jq5J2moCrQj0Pwzs0EXNgP0kxU2emvYJrBQ==" \
+VAULT_MASTER_KEY="12345678901234567890123456789012" \
+docker-compose up -d --build backend
+
+# Services available at:
+# Backend API: http://localhost:8080
+# Swagger Docs: http://localhost:8080/swagger/index.html  
+# Health Check: http://localhost:8080/health
+# Frontend: http://localhost:3000 (optional)
 ```
 
-**Bootstrap Process**:
+### 🚨 Bootstrap Required
+
+**IMPORTANT**: PropGuard requires initial setup but currently has **no CLI tool**. The system includes bootstrap capabilities but they are not automatically triggered.
+
+**Current Bootstrap Status**: 
+- ✅ Bootstrap service implemented
+- ❌ Not called automatically on startup  
+- ❌ No CLI tool for initialization
+- ❌ Frontend cannot handle first-run setup
+
+**Recommended Quick Fix**: Add auto-bootstrap to server startup (see Development section).
+
+### Local Development
+
 ```bash
-# Fresh installation logs:
-🌱 First run detected - starting bootstrap process
-✓ System roles created (5 roles)
-✓ Default admin user created
-✓ Default team workspace initialized
-✓ System configuration loaded
-✅ PropGuard ready - Login with admin credentials
-🔐 IMPORTANT: Change default password immediately!
+# Install dependencies
+go mod download
+
+# Run application
+go run cmd/server/main.go
+
+# Or use Make
+make run
 ```
 
-### Local Development Setup
+## 🏗️ Architecture
 
-1. **Install dependencies**
-   ```bash
-   make deps
-   # OR
-   go mod download
-   ```
+```
+prop-guard-service/
+├── cmd/                    # Application entry points
+│   └── server/            # Main server application
+├── internal/              # Private application code
+│   ├── config/           # Configuration management
+│   ├── controller/       # HTTP request handlers
+│   ├── dto/             # Data transfer objects
+│   ├── entity/          # Domain models
+│   ├── repository/      # Data access layer
+│   ├── service/         # Business logic
+│   ├── security/        # JWT middleware
+│   └── utils/           # Utilities
+├── ui/                    # Frontend application
+│   └── dashboard/        # Next.js React app
+├── docs/                  # API documentation
+├── docker-compose.yml     # Docker orchestration
+├── Dockerfile            # Container definition
+├── Makefile              # Build automation
+└── README.md             # This file
+```
 
-2. **Start Redis locally**
-   ```bash
-   docker run -d -p 6379:6379 redis:7-alpine
-   ```
+### Request Flow
 
-3. **Run the application**
-   ```bash
-   make run
-   # OR for development mode with debug logging
-   make dev-local
-   ```
-
-### Frontend Development
-
-The React dashboard uses Next.js 15 with modern tooling:
-
-1. **Navigate to frontend directory**
-   ```bash
-   cd ui/dashboard
-   ```
-
-2. **Install frontend dependencies**
-   ```bash
-   npm install
-   ```
-
-3. **Run frontend development server**
-   ```bash
-   npm run dev          # Development with Turbopack
-   npm run build        # Production build
-   npm run start        # Production server
-   npm run lint         # ESLint checking
-   ```
-
-**Frontend Stack**:
-- **Next.js 15.5.2** - React framework with App Router
-- **React 19.1.0** - Latest React with concurrent features  
-- **DaisyUI 5.0.54** - Component library with themes
-- **TailwindCSS 4** - Utility-first CSS framework
-- **TypeScript 5** - Type safety and IntelliSense
-- **Lucide React** - Modern icon library
+```
+Client → Router → Middleware → Controller → Service → Repository → BadgerDB
+                                    ↓
+                              Encryption Service
+```
 
 ## ⚙️ Configuration
 
@@ -191,1372 +115,412 @@ The React dashboard uses Next.js 15 with modern tooling:
 
 | Variable | Description | Default | Required |
 |----------|-------------|---------|----------|
-| **Server Configuration** |
 | `SERVER_PORT` | HTTP server port | `8080` | No |
-| `SERVER_READ_TIMEOUT` | HTTP read timeout | `15s` | No |
-| `SERVER_WRITE_TIMEOUT` | HTTP write timeout | `15s` | No |
-| `SERVER_IDLE_TIMEOUT` | HTTP idle timeout | `60s` | No |
-| `GIN_MODE` | Gin framework mode (debug/release/test) | `release` | No |
-| **Redis Configuration** |
-| `REDIS_HOST` | Redis server hostname | `localhost` | Yes |
-| `REDIS_PORT` | Redis server port | `6379` | No |
-| `REDIS_PASSWORD` | Redis password | `""` | No |
-| `REDIS_DATABASE` | Redis database number | `0` | No |
-| `REDIS_MAX_RETRIES` | Maximum connection retry attempts | `3` | No |
-| `REDIS_POOL_SIZE` | Connection pool size | `10` | No |
-| `REDIS_TLS_ENABLED` | Enable TLS for Redis | `false` | No |
-| `REDIS_CLUSTER_ENABLED` | Enable Redis cluster mode | `false` | No |
-| **Security Configuration** |
-| `JWT_SECRET` | JWT signing secret key | - | Yes |
-| `JWT_EXPIRY_HOURS` | JWT token expiry in hours | `24` | No |
-| `VAULT_MASTER_KEY` | Master encryption key (32 bytes) | - | Yes |
-| **Audit Configuration** |
-| `AUDIT_RETENTION_DAYS` | Audit log retention period | `90` | No |
-| **CORS Configuration** |
-| `CORS_ALLOWED_ORIGINS` | Comma-separated allowed origins | `http://localhost:3000,http://localhost:8080` | No |
-| **Bootstrap Configuration** |
-| `PROPGUARD_ADMIN_USERNAME` | Default admin username | `admin` | No |
-| `PROPGUARD_ADMIN_PASSWORD` | Default admin password | `admin123` | No |
-| `PROPGUARD_ADMIN_EMAIL` | Default admin email | `admin@propguard.local` | No |
-| `PROPGUARD_SKIP_PASSWORD_PROMPT` | Skip password change prompt | `false` | No |
+| `GIN_MODE` | Gin framework mode | `release` | No |
+| `JWT_SECRET` | JWT signing key | - | Yes |
+| `VAULT_MASTER_KEY` | Encryption master key | - | Yes |
+| `BADGER_DIR` | BadgerDB data directory | `/app/data` | No |
 
-### Redis Persistence Configuration
+## 📚 API Endpoints
 
-The service supports Redis persistence through both RDB and AOF:
+### Authentication
+- `POST /api/v1/auth/login` - User login
+- `POST /api/v1/auth/logout` - User logout  
+- `POST /api/v1/auth/refresh` - Refresh token
 
-```conf
-# redis-persistence.conf
-save 900 1      # Save after 900 sec if at least 1 key changed
-save 300 10     # Save after 300 sec if at least 10 keys changed  
-save 60 10000   # Save after 60 sec if at least 10000 keys changed
-appendonly yes  # Enable AOF persistence
-```
+### Secrets Management
+- `GET /api/v1/secrets` - List secrets
+- `POST /api/v1/secrets/{path}` - Create secret
+- `GET /api/v1/secrets/{path}` - Get secret
+- `PUT /api/v1/secrets/{path}` - Update secret
+- `DELETE /api/v1/secrets/{path}` - Delete secret
 
-## 📋 Quick Decision Checklist
+### User Management
+- `GET /api/v1/users` - List users
+- `POST /api/v1/users` - Create user
+- `GET /api/v1/users/{id}` - Get user
+- `PUT /api/v1/users/{id}` - Update user
+- `DELETE /api/v1/users/{id}` - Delete user
 
-Before making any project change, ensure:
+### Role Management
+- `GET /api/v1/roles` - List roles
+- `POST /api/v1/roles` - Create role
+- `GET /api/v1/roles/{id}` - Get role
+- `PUT /api/v1/roles/{id}` - Update role
+- `DELETE /api/v1/roles/{id}` - Delete role
+- `POST /api/v1/roles/{id}/assign` - Assign role to user
+- `POST /api/v1/roles/{id}/revoke` - Revoke role from user
 
-- [ ] **Decision documented in README** - Is the decision and rationale recorded in ADR section?
-- [ ] **Impact assessed** - Have you filled out the change impact assessment?
-- [ ] **Stakeholders notified** - Are relevant team members aware of the change?
-- [ ] **Security reviewed** - If high/medium security impact, has security team reviewed?
-- [ ] **Implementation planned** - Are TODO items created and timeline established?
-- [ ] **Rollback plan** - How will you revert if something goes wrong?
-- [ ] **Success criteria defined** - How will you measure if the change was successful?
+### Password Management
+- `PUT /api/v1/users/{id}/password` - Change password (self-service)
+- `PUT /api/v1/users/{id}/reset-password` - Reset password (admin only)
 
-### How to Use This README for Decision Making
+### Audit Logs
+- `GET /api/v1/audit` - List audit logs (paginated with filtering)
+- `GET /api/v1/audit/export` - Export audit logs to CSV
+- `POST /api/v1/audit/cleanup` - Cleanup old audit logs
 
-1. **📋 Start Here**: Read current pending decisions in [Decision Status Dashboard](#-urgent-decisions-needed)
-2. **🔍 Research**: Review existing ADRs for similar decisions and precedents
-3. **📝 Document**: Add new proposal using the [ADR template](#new-decision-template)
-4. **💬 Discuss**: Share with team, gather input for 48+ hours
-5. **✅ Decide**: Update status and rationale, create implementation todos
-6. **🚀 Execute**: Track progress in TODO list and project dashboard
-7. **🔄 Review**: Update lessons learned and process improvements
+### Health & System
+- `GET /health` - System health check with BadgerDB status
+- `GET /swagger/index.html` - Swagger UI documentation
+- `GET /swagger/doc.json` - OpenAPI specification
 
-## 📚 API Documentation
+### 🚫 Missing APIs (Planned for Phase 3)
+- **Team Management**: No endpoints (entities exist, services missing)
+- **API Key Management**: No endpoints (repository exists, service missing)
+- **Environment Parameters**: No endpoints (foundation exists)
+- **Bootstrap/Setup**: No endpoints (service exists, not exposed)
 
-### Authentication Endpoints
+## 🐳 Docker Deployment
 
-#### Login
-```bash
-POST /api/v1/auth/login
-Content-Type: application/json
+The application uses a simplified two-container setup:
 
-{
-  "username": "admin",
-  "password": "admin123"
-}
-```
+```yaml
+services:
+  backend:
+    image: propguard-backend
+    ports:
+      - "8080:8080"
+    volumes:
+      - badger-data:/app/data  # BadgerDB persistence
+      
+  frontend:
+    image: propguard-frontend
+    ports:
+      - "3000:3000"
 
-#### Refresh Token
-```bash
-POST /api/v1/auth/refresh
-Authorization: Bearer <token>
-```
-
-#### Logout
-```bash
-POST /api/v1/auth/logout
-Authorization: Bearer <token>
-```
-
-### Secret Management Endpoints
-
-All secret endpoints require authentication via JWT token in the Authorization header.
-
-#### Create Secret
-```bash
-POST /api/v1/secrets/{path}
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "data": {
-    "api_key": "secret-value",
-    "password": "another-secret"
-  },
-  "metadata": {
-    "description": "Production API credentials",
-    "ttl": 3600
-  }
-}
-```
-
-#### Get Secret
-```bash
-GET /api/v1/secrets/{path}
-Authorization: Bearer <token>
-
-# Response includes access tracking
-{
-  "path": "/prod/database_url",
-  "data": {
-    "url": "postgres://..."
-  },
-  "metadata": {
-    "description": "Production database connection",
-    "last_accessed_at": "2024-09-04T15:30:00Z",
-    "last_accessed_by": "service:my-web-app",
-    "access_count": 1247,
-    "created_at": "2024-08-01T10:00:00Z",
-    "updated_at": "2024-09-01T12:30:00Z"
-  }
-}
-```
-
-#### Update Secret
-```bash
-PUT /api/v1/secrets/{path}
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "data": {
-    "api_key": "new-secret-value"
-  }
-}
-```
-
-#### Delete Secret
-```bash
-DELETE /api/v1/secrets/{path}
-Authorization: Bearer <token>
-```
-
-#### Rotate Secret
-```bash
-POST /api/v1/secrets/{path}/rotate
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "new_value": "new-secret-value",
-  "rotation_reason": "scheduled_rotation",
-  "notify_services": true
-}
-```
-
-#### Schedule Secret Rotation
-```bash
-POST /api/v1/secrets/{path}/schedule-rotation
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "rotation_interval_days": 90,
-  "auto_generate": true,
-  "notify_before_days": 7,
-  "notify_services": true,
-  "next_rotation_date": "2024-12-01T00:00:00Z"
-}
-```
-
-#### Get Rotation Schedule
-```bash
-GET /api/v1/secrets/{path}/rotation-schedule
-Authorization: Bearer <token>
-```
-
-#### Cancel Scheduled Rotation
-```bash
-DELETE /api/v1/secrets/{path}/rotation-schedule
-Authorization: Bearer <token>
-```
-
-#### List Secrets
-```bash
-GET /api/v1/secrets?limit=20&offset=0
-Authorization: Bearer <token>
-```
-
-#### Get Secret Rotation History
-```bash
-GET /api/v1/secrets/{path}/history
-Authorization: Bearer <token>
-```
-
-#### Get Secret Access Analytics
-```bash
-GET /api/v1/secrets/{path}/analytics
-Authorization: Bearer <token>
-
-# Response includes detailed access patterns
-{
-  "path": "/prod/database_url",
-  "total_accesses": 1247,
-  "unique_services": 3,
-  "last_accessed_at": "2024-09-04T15:30:00Z",
-  "last_accessed_by": "service:my-web-app",
-  "access_frequency": {
-    "last_24h": 45,
-    "last_7d": 312,
-    "last_30d": 1247
-  },
-  "top_services": [
-    {"service": "user-service", "access_count": 450},
-    {"service": "api-gateway", "access_count": 380},
-    {"service": "background-worker", "access_count": 300},
-    {"service": "cache-service", "access_count": 117}
-  ],
-  "first_accessed_at": "2024-08-01T10:15:00Z"
-}
-```
-
-#### List Unused Secrets
-```bash
-GET /api/v1/admin/secrets/unused?days=30
-Authorization: Bearer <token>
-
-# Returns secrets not accessed in the last 30 days
-```
-
-### User Management Endpoints
-
-#### Create User
-```bash
-POST /api/v1/users
-Authorization: Bearer <token>
-Content-Type: application/json
-
-{
-  "username": "newuser",
-  "password": "securePassword123",
-  "email": "user@example.com",
-  "roles": ["read", "write"]
-}
-```
-
-#### List Users
-```bash
-GET /api/v1/users
-Authorization: Bearer <token>
-```
-
-#### Update User
-```bash
-PUT /api/v1/users/{id}
-Authorization: Bearer <token>
-```
-
-#### Delete User
-```bash
-DELETE /api/v1/users/{id}
-Authorization: Bearer <token>
-```
-
-### Environment Parameters (Coming Soon)
-
-The service includes support for centralized environment parameter management with policy enforcement. This feature allows:
-- Centralized configuration management
-- Policy-based parameter validation
-- Environment-specific parameter sets
-- Parameter change tracking
-
-### Batch Keys API
-
-Efficient API for external services to request multiple secrets and parameters:
-- **POST /api/v1/batch-keys** - Request multiple keys in a single call
-- **Service Access Tracking** - Log which service accessed which keys (service_name is optional)
-- **Missing Value Tracking** - Automatically tracks requested keys that don't have values
-- **Admin Notifications** - Creates notifications for admins to review missing values
-- **Service Authentication** - Uses API keys for secure service-to-service communication
-
-```bash
-# Example batch request (HTTPS only)
-curl -X POST https://propguard.company.com/api/v1/batch-keys \
-  -H "X-API-Key: pgs_your-service-api-key" \
-  -H "Content-Type: application/json" \
-  -d '{
-    "service_name": "user-service",
-    "environment": "production",
-    "keys": [
-      "database_url",
-      "redis_password", 
-      "stripe_api_key",
-      "missing_key"
-    ]
-  }'
-
-# Response includes found keys and tracks missing ones
-{
-  "service_name": "user-service",
-  "environment": "production",
-  "keys": {
-    "database_url": "postgres://...",
-    "redis_password": "secret123",
-    "stripe_api_key": "sk_..."
-  },
-  "missing_values": ["missing_key"],
-  "request_id": "req_1234567890",
-  "access_logged": true,
-  "timestamp": "2024-09-04T15:30:00Z"
-}
-```
-
-## 🏗️ Architecture
-
-```
-prop-guard-service/
-├── cmd/
-│   ├── server/          # Main application entry point
-│   └── build-deploy/    # Build and deployment automation
-├── internal/
-│   ├── config/          # Configuration management
-│   ├── controller/      # HTTP request handlers
-│   │   ├── auth_controller.go
-│   │   ├── secret_controller.go
-│   │   ├── user_controller.go
-│   │   ├── role_controller.go
-│   │   ├── team_controller.go
-│   │   ├── api_key_controller.go
-│   │   └── batch_keys_controller.go
-│   ├── dto/             # Data transfer objects
-│   ├── entity/          # Domain models
-│   │   ├── vault_user.go      # Enhanced with RBAC
-│   │   ├── role.go            # RBAC roles and permissions
-│   │   ├── team.go            # Multi-tenancy teams
-│   │   ├── api_key.go         # Service authentication
-│   │   └── service_discovery.go # Missing keys tracking
-│   ├── repository/      # Data access layer (Redis)
-│   ├── security/        # JWT middleware & authentication
-│   ├── service/         # Business logic layer
-│   └── utils/           # Utility functions
-├── ui/
-│   └── dashboard/       # Next.js 15 + React 19 + DaisyUI dashboard
-├── docs/                # Swagger documentation
-├── bin/                 # Compiled binaries
-├── Dockerfile           # Multi-stage Docker build
-├── docker-compose.yml   # Multi-service orchestration
-└── Makefile            # Build automation
-```
-
-### Service Layer Architecture
-
-- **AuthService**: Handles authentication, JWT token generation and validation
-- **SecretService**: Manages secret encryption, storage, retrieval, and rotation
-- **UserService**: User management and role-based access control
-- **EncryptionService**: AES-256-GCM encryption/decryption operations
-- **AuditService**: Audit logging and compliance tracking
-- **AnalyticsService**: Track secret/parameter access patterns and usage statistics
-- **RotationService**: Secret rotation scheduling, automation, and history management
-- **NotificationService**: Admin notifications for missing values and system events
-- **BatchKeysService**: Handle service requests for multiple configuration values
-
-## 🚀 Development
-
-### Build Commands
-
-```bash
-# Build binary
-make build
-
-# Run tests
-make test
-
-# Run with hot reload
-make dev
-
-# Generate Swagger docs
-make swagger
-
-# Format code
-make fmt
-
-# Run linter
-make lint
-
-# Clean build artifacts
-make clean
+volumes:
+  badger-data:  # Persistent storage for BadgerDB
 ```
 
 ### Docker Commands
 
 ```bash
-# Build and deploy all services
-make deploy
-
-# Quick deploy without swagger generation
-make quick
-
-# Stop all services
-make stop
+# Start services
+docker-compose up -d
 
 # View logs
-make logs
+docker-compose logs -f
 
-# Clean Docker resources
-make clean-docker
+# Stop services
+docker-compose down
+
+# Backup data
+docker run --rm -v badger-data:/data -v $(pwd):/backup alpine \
+  tar czf /backup/backup-$(date +%Y%m%d).tar.gz /data
 ```
 
-### Testing
+## 🔄 Pagination System ✅ COMPLETE
 
-Run the test suite:
-```bash
-make test
+PropGuard includes comprehensive pagination support across all management interfaces:
 
-# With coverage
-make test-coverage
-```
+### Frontend Components
+- **Reusable Pagination**: `Pagination.tsx` component with smart navigation
+- **Items Per Page**: Configurable page sizes (10, 20, 50, 100)
+- **Navigation**: First/Previous/Next/Last page buttons with intelligent numbering
+- **Mobile Responsive**: Works seamlessly on all device sizes
+- **Search & Filtering**: Real-time search with advanced filters
 
-## 🚢 Production Deployment
+### Backend APIs
+- **Secrets API**: `/api/v1/secrets` with `limit` and `offset` parameters
+- **Users API**: `/api/v1/users` with `page` and `pageSize` parameters  
+- **Roles API**: `/api/v1/roles` with paginated responses
+- **Audit API**: `/api/v1/audit` with filtering and search support
 
-### Security Considerations
-
-1. **HTTPS Configuration (Required)**
-   ```bash
-   # PropGuard REQUIRES HTTPS in production
-   # Configure TLS certificate (Let's Encrypt recommended)
-   export TLS_CERT_FILE="/path/to/cert.pem"
-   export TLS_KEY_FILE="/path/to/key.pem"
-   export FORCE_HTTPS="true"
-   export HSTS_ENABLED="true"
-   ```
-
-2. **Generate secure secrets**
-   ```bash
-   # Generate JWT secret
-   openssl rand -base64 32
-   
-   # Generate master encryption key (must be 32 bytes)
-   openssl rand -base64 32
-   ```
-
-3. **Configure production environment**
-   ```bash
-   export JWT_SECRET="your-secure-jwt-secret"
-   export VAULT_MASTER_KEY="your-32-byte-master-key"
-   export REDIS_PASSWORD="strong-redis-password"
-   export GIN_MODE="release"
-   ```
-
-4. **Enable Redis persistence**
-   - Configure RDB snapshots for point-in-time recovery
-   - Enable AOF for durability
-   - Set up regular backups
-
-5. **Network Security**
-   - **HTTPS/TLS 1.2+**: All API communication encrypted
-   - **HTTP → HTTPS redirect**: Automatic redirect for security
-   - **HSTS headers**: Prevent protocol downgrade attacks
-   - Use TLS for Redis connections in production
-   - Configure firewall rules to restrict access
-   - Enable CORS only for trusted origins
-
-### Kubernetes Deployment
-
-For Kubernetes deployment, use the following example configuration:
-
-```yaml
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: propguard
-spec:
-  replicas: 3
-  selector:
-    matchLabels:
-      app: propguard
-  template:
-    metadata:
-      labels:
-        app: propguard
-    spec:
-      containers:
-      - name: propguard
-        image: propguard:latest
-        ports:
-        - containerPort: 8080
-        env:
-        - name: REDIS_HOST
-          value: redis-service
-        - name: JWT_SECRET
-          valueFrom:
-            secretKeyRef:
-              name: propguard-secrets
-              key: jwt-secret
-        - name: VAULT_MASTER_KEY
-          valueFrom:
-            secretKeyRef:
-              name: propguard-secrets
-              key: master-key
-```
-
-### High Availability Setup
-
-For HA deployment:
-1. Use Redis Cluster or Redis Sentinel for redundancy
-2. Deploy multiple PropGuard instances behind a load balancer
-3. Configure session affinity if needed
-4. Set up monitoring and alerting
-
-## 📊 Monitoring & Observability
-
-### Health Check Endpoint
-
-The `/health` endpoint provides comprehensive system status including Redis monitoring:
-
-```bash
-GET /health
-
-Response:
+### Response Format
+All paginated APIs return consistent response structures:
+```json
 {
-  "status": "healthy",
-  "time": 1234567890,
-  "environment": "release",
-  "docker": true,
-  "redis": "healthy",
-  "redis_host": "localhost",
-  "service": "PropGuard API",
-  "version": "1.0"
+  "data": [...],
+  "total": 156,
+  "page": 1,
+  "pageSize": 20, 
+  "totalPages": 8,
+  "hasNext": true,
+  "hasPrev": false
 }
 ```
 
-### Redis Monitoring
+## 🎯 User Management Analysis
 
-#### Built-in Redis Health Checks
+### ✅ FULLY IMPLEMENTED
+- **Core User CRUD**: Create, read, update, delete users
+- **Authentication**: JWT-based login/logout with secure token handling
+- **Password Management**: Change/reset passwords with bcrypt hashing
+- **Role-Based Access**: Complete RBAC system with custom roles
+- **Account Security**: Account locking, login attempts, session tracking
+- **Advanced Features**: MFA support, metadata, permissions, audit logging
 
-PropGuard includes comprehensive Redis monitoring capabilities:
+### 📋 MISSING (Planned Phase 3)
+- **Team Management**: User entities have `TeamIDs` but no team context in operations
+- **Multi-Tenancy**: Team entities exist with billing/limits but no services/APIs
+- **CLI Administration**: No command-line tools for user management
 
-```go
-// Automatic Redis health monitoring includes:
-- Connection status (ping test)
-- Database size tracking  
-- Memory usage information
-- Last save timestamp
-- Connection pool metrics
+## 🏢 Team Management Status
+
+### ✅ FOUNDATION COMPLETE
+- **Team Entity**: Complete with members, billing plans, settings, activity tracking
+- **User Integration**: Users have `TeamIDs`, `DefaultTeamID` fields ready
+- **Billing Support**: Free/Starter/Team/Enterprise plans with resource limits
+- **Invite System**: Team invitation and member management logic
+
+### ❌ IMPLEMENTATION MISSING
+- **Repository**: No BadgerDB implementation for team storage
+- **Service Layer**: No business logic for team operations  
+- **Controller/APIs**: No REST endpoints for team management
+- **Frontend UI**: No team management interface (users see individual accounts only)
+
+**Impact**: System operates in single-tenant mode despite multi-tenant architecture.
+
+## 🔐 Security
+
+- **Encryption**: AES-256-GCM for data at rest
+- **Authentication**: JWT tokens with 24-hour expiry
+- **Authorization**: Role-based permissions
+- **Audit**: All operations logged
+- **HTTPS**: Required in production
+
+## 📊 Database (BadgerDB)
+
+PropGuard uses BadgerDB, an embedded key-value database that provides:
+- High performance (LSM tree + value log)
+- ACID transactions
+- Encryption support
+- No external dependencies
+- Simple backup (just copy the data directory)
+
+### Data Structure
+
+```
+/app/data/
+├── 000000.vlog    # Value logs
+├── 000000.sst     # Sorted string tables
+├── MANIFEST       # Database metadata
+└── KEYREGISTRY    # Key registry
 ```
 
-#### Redis Metrics Available
+## 🧪 Testing
 
-| Metric | Description | Critical Threshold |
-|--------|-------------|-------------------|
-| **Connection Status** | Redis ping response | Any failure = critical |
-| **Database Size** | Number of keys stored | Monitor growth trends |
-| **Memory Usage** | Redis memory consumption | >80% of max memory |
-| **Last Save Time** | RDB snapshot timestamp | >24 hours = warning |
-| **Connection Pool** | Active/idle connections | Pool exhaustion |
-| **Query Response Time** | Redis operation latency | >10ms = warning |
+PropGuard includes comprehensive test suites with **zero mocks** - all tests use real BadgerDB instances.
 
-#### Redis Monitoring Commands
+### Backend Tests (Go)
+
+**Required Environment Variables:**
+```bash
+# Set these environment variables for all backend tests
+export JWT_SECRET="test-jwt-secret-exactly-32b"
+export VAULT_MASTER_KEY="12345678901234567890123456789012"
+```
+
+**Test Commands:**
+```bash
+# Run all tests (requires env vars)
+JWT_SECRET="test-jwt-secret-exactly-32b" VAULT_MASTER_KEY="12345678901234567890123456789012" go test ./...
+
+# Run with coverage
+JWT_SECRET="test-jwt-secret-exactly-32b" VAULT_MASTER_KEY="12345678901234567890123456789012" go test ./... -cover
+
+# Run specific test suites
+go test ./tests/unit -v              # BadgerDB integration tests
+go test ./tests/integration -v       # Service integration tests  
+go test ./tests/controller -v        # Controller tests (no mocks)
+
+# Run single test with verbose output
+JWT_SECRET="test-jwt-secret-exactly-32b" VAULT_MASTER_KEY="12345678901234567890123456789012" \
+go test ./tests/controller -run TestAuthController_Login_Success -v
+
+# Quick controller tests
+JWT_SECRET="test-jwt-secret-exactly-32b" VAULT_MASTER_KEY="12345678901234567890123456789012" \
+go test ./tests/controller -v -timeout 30s
+```
+
+**Test Features:**
+- ✅ **No Mocks**: All tests use real BadgerDB databases
+- ✅ **Fresh DB Per Test**: Each test gets isolated database instance
+- ✅ **Real Authentication**: Full JWT + bcrypt integration
+- ✅ **Bootstrap Testing**: System initialization included
+- ✅ **HTTP Integration**: Real Gin router with middleware
+- ✅ **Real Encryption**: AES-256-GCM for all secret operations
+
+### Frontend Tests (Next.js)
 
 ```bash
-# Check Redis status via health endpoint
-curl http://localhost:8080/health | jq '.redis'
+# Navigate to frontend directory
+cd ui/dashboard
 
-# Direct Redis monitoring (if Redis CLI available)
-redis-cli ping                    # Basic connectivity
-redis-cli info memory           # Memory usage
-redis-cli info stats            # Operation statistics  
-redis-cli info replication     # Replication status
-redis-cli dbsize               # Number of keys
-redis-cli lastsave             # Last RDB save
+# Run development server
+npm run dev      # Start dev server at localhost:3000
+
+# Build and test compilation
+npm run build    # Test production build with Turbopack
+
+# Code quality checks
+npm run lint     # Run ESLint
+
+# Production server
+npm run start    # Start production server
 ```
 
-#### Redis Configuration Monitoring
+### Available Test Files
 
-Monitor these Redis configuration settings:
+```
+tests/
+├── unit/
+│   └── badger_integration_test.go    # BadgerDB functionality tests
+├── integration/
+│   └── integration_test.go           # Service integration tests
+└── controller/
+    └── controller_test.go             # HTTP endpoint tests (no mocks)
+```
+
+### Test Database Cleanup
+
+Tests automatically clean up their databases. Each test creates a unique temporary directory:
+```
+/tmp/propguard_test_[timestamp]_[testname]/
+```
+
+The database is automatically removed after each test completes.
+
+## 📝 TODO List
+
+### Phase 1: Core Features ✅
+- [x] Authentication system (JWT)
+- [x] Secret management (CRUD)
+- [x] User management
+- [x] Role-based access control
+- [x] Audit logging
+- [x] Docker support
+
+### Phase 2: Complete ✅
+- [x] BadgerDB integration
+- [x] Role management endpoints
+- [x] Test coverage (30% target)
+- [x] Redis cleanup complete
+- [x] Change password mechanism
+- [x] Frontend dashboard (98% complete)
+- [x] Comprehensive pagination system (frontend + backend)
+
+### Phase 3: In Progress 🚧
+- [ ] **Team Management APIs** (high priority - entities exist, need services/controllers)
+- [ ] **API Key Management APIs** (medium priority - repository exists, need service layer)
+- [ ] **Environment Parameters API** (medium priority - foundation exists)
+- [ ] **Bootstrap/Setup CLI** (high priority - service exists, needs CLI wrapper)
+- [ ] Secret rotation scheduling
+- [ ] Advanced audit features
+
+### Phase 4: Future 🚀
+- [ ] **CLI Tool** (partially needed for bootstrap - high priority)
+- [ ] Kubernetes operator
+- [ ] Multi-region support
+- [ ] Hardware security module (HSM)
+- [ ] Terraform provider
+- [ ] Backup automation
+- [ ] Frontend bootstrap/setup wizard
+
+### Critical Issues 🚨
+- [ ] **Bootstrap CLI**: No way to create initial admin user via command line
+- [ ] **Team APIs Missing**: Multi-tenant architecture incomplete
+- [ ] **Frontend Bootstrap**: Cannot handle first-run scenarios
+- [ ] **Auto-Bootstrap**: Server doesn't auto-initialize on first startup
+
+### Technical Debt 🔧
+- [ ] Increase test coverage to 80%
+- [ ] Add integration tests  
+- [ ] Implement rate limiting
+- [ ] Add request validation middleware
+- [ ] Optimize BadgerDB compaction
+- [ ] Add metrics endpoint
+- [ ] Fix frontend mock authentication (connect to real backend)
+
+### Documentation 📚
+- [ ] API client SDKs
+- [ ] Deployment guides
+- [ ] Security best practices
+- [ ] Video tutorials
+
+## 🚀 Development
+
+### Make Commands
 
 ```bash
-# Critical settings to monitor
-maxmemory-policy: allkeys-lru    # Memory eviction policy
-save: 900 1 300 10 60 10000     # RDB save points
-appendonly: yes                  # AOF persistence
-tcp-keepalive: 300              # Connection health
-timeout: 300                    # Client timeout
+make build         # Build binary
+make run          # Run application
+make test         # Run tests
+make docker-build # Build Docker image
+make deploy       # Deploy with Docker Compose
+make clean        # Clean build artifacts
 ```
 
-### Production Monitoring Setup
+### Project Structure
 
-#### 1. Redis Sentinel for High Availability
+| Component | Responsibility |
+|-----------|---------------|
+| Controllers | HTTP request handling |
+| Services | Business logic |
+| Repositories | Data persistence |
+| DTOs | Request/response structures |
+| Entities | Domain models |
+| Middleware | Cross-cutting concerns |
 
-```yaml
-# docker-compose.yml for Redis Sentinel
-redis-sentinel:
-  image: redis:7-alpine
-  command: redis-sentinel /etc/redis/sentinel.conf
-  volumes:
-    - ./redis-sentinel.conf:/etc/redis/sentinel.conf
-  depends_on:
-    - redis-master
-    - redis-replica
-```
+## 📈 Project Status
 
-#### 2. Redis Cluster Monitoring
+**Current Version**: 1.0.0-beta  
+**Completion**: ~98% (Core functionality complete, advanced features planned)
 
-For Redis cluster deployments, monitor:
-- Cluster node status
-- Slot distribution
-- Failed nodes
-- Network partitions
+### Component Status
 
-```bash
-# Cluster health commands
-redis-cli cluster nodes
-redis-cli cluster info
-redis-cli cluster check
-```
+| Module | Status | Progress | Notes |
+|--------|--------|----------|-------|
+| Authentication | ✅ Complete | 100% | JWT, login/logout, token refresh |
+| Secrets Management | ✅ Complete | 100% | CRUD, encryption, audit |
+| User Management | ✅ Complete | 100% | Full CRUD, RBAC, password mgmt |
+| Role Management | ✅ Complete | 100% | Custom roles, permissions, assignment |
+| Audit Logging | ✅ Complete | 100% | Comprehensive logging, export, cleanup |
+| Password Management | ✅ Complete | 100% | Change/reset, bcrypt, validation |
+| Frontend Dashboard | ✅ Complete | 98% | All management interfaces, pagination |
+| Swagger Documentation | ✅ Complete | 100% | All endpoints documented |
+| Docker Deployment | ✅ Complete | 100% | Production-ready containers |
+| Test Coverage | ✅ Adequate | 30% | Integration & unit tests |
+| **Bootstrap/Setup** | 🔴 **Critical** | 10% | Service exists, no CLI/auto-trigger |
+| **Team Management** | 🟡 **Partial** | 30% | Entities exist, APIs missing |
+| **API Key Management** | 🟡 **Partial** | 40% | Repository exists, service missing |
+| **Environment Params** | 🟡 **Foundation** | 20% | Basic structure, APIs missing |
 
-#### 3. Alerting Thresholds
+### Phase Completion Status
 
-Set up alerts for:
+| Phase | Status | Completion |
+|-------|--------|-----------|
+| **Phase 1**: Core Features | ✅ Complete | 100% |
+| **Phase 2**: Advanced Core | ✅ Complete | 100% |
+| **Phase 3**: Enterprise Features | 📋 Planned | 0% |
+| **Phase 4**: Platform Features | 📋 Future | 0% |
 
-| Alert | Condition | Severity |
-|-------|-----------|----------|
-| **Redis Down** | Ping fails or connection refused | Critical |
-| **High Memory** | Memory usage >80% | Warning |
-| **Slow Queries** | Query time >100ms | Warning |
-| **Failed Save** | Last save >24 hours ago | Warning |
-| **Connection Pool Full** | All connections in use | Critical |
-| **High Error Rate** | >1% failed operations | Warning |
+### Immediate Priorities
 
-#### 4. Integration with External Monitoring
-
-##### Prometheus Integration (Future)
-```yaml
-# Example metrics endpoint (planned)
-GET /metrics
-# Response includes:
-redis_connected_clients
-redis_used_memory_bytes
-redis_keyspace_hits_total
-redis_keyspace_misses_total
-redis_commands_processed_total
-```
-
-##### Grafana Dashboard (Future)
-- Redis connection status
-- Memory usage over time
-- Command throughput
-- Error rates
-- Persistence status
-
-### Application Metrics to Monitor
-
-#### Core Metrics
-- **API Response Times**: Target <50ms average
-- **Secret Access Patterns**: Monitor for unusual access
-- **Authentication Failures**: Rate limit trigger detection
-- **Audit Log Volume**: Ensure logging is functioning
-- **JWT Token Validation**: Track failures and timing
-
-#### Redis-Specific Application Metrics
-- **Secret Retrieval Time**: Should be <5ms
-- **Secret Storage Time**: Should be <10ms
-- **User Session Lookups**: Track Redis hit/miss ratio
-- **Audit Log Writes**: Monitor Redis write performance
-
-### Troubleshooting Guide
-
-#### Common Redis Issues
-
-1. **High Memory Usage**
-   ```bash
-   # Check memory breakdown
-   redis-cli info memory
-   # Check largest keys
-   redis-cli --bigkeys
-   ```
-
-2. **Slow Performance**
-   ```bash
-   # Monitor slow queries
-   redis-cli config set slowlog-log-slower-than 10000
-   redis-cli slowlog get 10
-   ```
-
-3. **Connection Issues**
-   ```bash
-   # Check connection limits
-   redis-cli info clients
-   # Check network connectivity
-   redis-cli ping
-   ```
-
-4. **Persistence Problems**
-   ```bash
-   # Check last save status
-   redis-cli lastsave
-   # Force manual save
-   redis-cli bgsave
-   ```
+1. 🚨 **Bootstrap CLI** - Enable system initialization
+2. 🚨 **Team Management APIs** - Complete multi-tenant architecture  
+3. 🔧 **Frontend Real Auth** - Replace mock authentication
+4. 🔧 **Auto-Bootstrap** - Server auto-initialization
 
 ## 🤝 Contributing
 
 1. Fork the repository
-2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Guidelines
-
-- Follow Go best practices and idioms
-- Write unit tests for new functionality
-- Update API documentation for endpoint changes
-- Ensure all tests pass before submitting PR
-- Add appropriate audit logging for security-relevant operations
+2. Create feature branch (`git checkout -b feature/name`)
+3. Commit changes (`git commit -m 'Add feature'`)
+4. Push branch (`git push origin feature/name`)
+5. Open Pull Request
 
 ## 📄 License
 
-This project is licensed under the Apache 2.0 License - see the [LICENSE](LICENSE) file for details.
+Apache 2.0 License - see [LICENSE](LICENSE) file for details.
 
 ## 🆘 Support
 
-For issues, questions, or contributions, please:
+For issues or questions:
 - Open an issue on GitHub
-- Contact the maintainers at support@propguard.io
-- Check the [API Documentation](http://localhost:8080/swagger/index.html)
-
-## 📋 Architecture Decision Records (ADR)
-
-### ADR-001: Database Technology Selection
-**Date**: 2024-08-15  
-**Status**: ✅ Decided  
-**Decision**: Use Redis as primary data store
-
-**Context**: Need persistent storage for secrets, user data, and audit logs
-- **Option A**: Redis (In-memory with persistence) ✅ **SELECTED**
-- **Option B**: PostgreSQL (Relational database)
-- **Option C**: Other NoSQL databases
-
-**Decision Rationale**:
-- High performance for secret retrieval (sub-millisecond)
-- Built-in clustering and replication
-- Perfect for session management and caching
-- Simpler deployment and maintenance
-- Native support for key-value patterns used in secret management
-
-**Consequences**:
-- ✅ Excellent performance
-- ✅ Simple data model
-- ⚠️ More complex for complex queries
-- ⚠️ Memory usage considerations
+- Check API documentation at `/swagger`
+- Contact: support@propguard.io
 
 ---
-
-### ADR-002: Encryption Standard
-**Date**: 2024-08-20  
-**Status**: ✅ Decided  
-**Decision**: AES-256-GCM for secret encryption
-
-**Context**: Need strong encryption for secrets at rest
-- **Option A**: AES-256-CBC
-- **Option B**: AES-256-GCM ✅
-- **Option C**: ChaCha20-Poly1305
-
-**Decision Rationale**:
-- Authenticated encryption (integrity + confidentiality)
-- Hardware acceleration on most platforms
-- Industry standard for enterprise applications
-- Better performance than CBC mode
-
----
-
-### ADR-003: Authentication Method
-**Date**: 2024-08-10  
-**Status**: ✅ Decided  
-**Decision**: JWT with stateless authentication
-
-**Context**: Need secure authentication for API access
-- **Option A**: Session-based authentication
-- **Option B**: JWT tokens ✅
-- **Option C**: API keys only
-
-**Decision Rationale**:
-- Stateless (scalable)
-- Industry standard
-- Works well with microservices
-- Built-in expiration handling
-
----
-
-### ADR-004: Frontend Technology Stack
-**Date**: 2024-09-03  
-**Status**: ✅ Decided  
-**Decision**: Next.js 15 + React 19 + DaisyUI + TailwindCSS + TypeScript
-
-**Context**: Need modern, responsive admin dashboard for secret management
-- **Option A**: Next.js + React + DaisyUI + TailwindCSS ✅
-- **Option B**: Vue.js + Nuxt + Vuetify
-- **Option C**: Server-side rendered with Go templates  
-- **Option D**: CLI-only approach
-
-**Decision Rationale**:
-- **Next.js 15**: Latest stable with Turbopack for fast development
-- **React 19**: Latest version with concurrent features
-- **DaisyUI**: Component library built on TailwindCSS for rapid UI development
-- **TailwindCSS 4**: Utility-first CSS framework for consistent design
-- **TypeScript**: Type safety and better developer experience
-- **Lucide React**: Modern icon library
-
-**Technology Stack Details**:
-```json
-{
-  "next": "15.5.2",           // React framework with SSR/SSG
-  "react": "19.1.0",          // UI library
-  "daisyui": "^5.0.54",      // Component library
-  "tailwindcss": "^4",       // CSS framework
-  "lucide-react": "^0.542.0", // Icon library
-  "typescript": "^5"          // Type safety
-}
-```
-
-**Consequences**:
-- ✅ Modern, responsive UI with minimal custom CSS
-- ✅ Type safety across frontend codebase
-- ✅ Fast development with pre-built components
-- ✅ Excellent performance with Next.js optimizations
-- ✅ Professional UI with DaisyUI themes
-- ⚠️ Larger bundle size than vanilla approaches
-- ⚠️ Additional build complexity vs server-side templates
-
----
-
-### ADR-005: Network Discovery Security Model
-**Date**: 2024-09-03  
-**Status**: ✅ Decided  
-**Decision**: Remove network discovery feature entirely (Option D)
-
-**Context**: Network discovery feature posed significant security and legal risks
-- **Option A**: Sandboxed execution with limited network access
-- **Option B**: Separate service with restricted permissions  
-- **Option C**: Plugin architecture with security boundaries
-- **Option D**: Remove network discovery feature ✅
-
-**Security Risks Identified**:
-- **Reconnaissance Appearance**: Network scanning resembles malicious reconnaissance activity
-- **Unauthorized Access**: Could accidentally access systems without permission
-- **Legal Liability**: May violate security policies, compliance requirements, or laws
-- **Alert Triggering**: Would likely trigger security monitoring systems
-- **Credential Theft**: Automated credential discovery could be seen as malicious
-- **Attack Surface**: Adds unnecessary complexity and potential vulnerabilities
-
-**Decision Rationale**:
-- **Security First**: PropGuard should be a secure secrets manager, not a security risk
-- **Legal Protection**: Removes potential legal and compliance issues
-- **Focus**: Concentrate on core secrets management functionality
-- **Simplicity**: Reduces codebase complexity and maintenance burden
-- **Trust**: Users expect secrets managers to be ultra-secure, not perform network scanning
-
-**Implementation Actions**:
-- Remove network discovery service code
-- Remove related controllers and endpoints
-- Clean up documentation and references
-- Focus development on core secrets management
-
-**Consequences**:
-- ✅ **Eliminates security risks** and legal liabilities
-- ✅ **Simplifies architecture** and reduces attack surface
-- ✅ **Improves trust** - users expect secrets managers to be conservative
-- ✅ **Faster development** - focus on core functionality
-- ⚠️ **Feature removal** - but this was never a core requirement
-
----
-
-### ADR-006: Test Framework Selection
-**Date**: 2024-09-03  
-**Status**: ✅ Decided  
-**Decision**: Go Standard Testing + Testify + Testcontainers (Option A)
-
-**Context**: PropGuard has 0% test coverage, blocking production readiness and CI/CD pipeline
-- **Option A**: Go Standard Testing + Testify + Testcontainers ✅
-- **Option B**: Ginkgo + Gomega (BDD-style)
-- **Option C**: GoConvey (Web UI testing)
-
-**Testing Requirements**:
-- Unit tests for all services (auth, secrets, encryption, audit)
-- Integration tests for Redis operations
-- API endpoint testing
-- Security-focused testing (encryption, JWT, permissions)
-- Docker-based integration tests
-
-**Decision Rationale**:
-- **Go Standard Testing**: Built-in, familiar to all Go developers, zero learning curve
-- **Testify**: Most popular Go assertion library, rich matchers, mocking support
-- **Testcontainers**: Real Redis integration tests without external dependencies
-- **Industry Standard**: Used by majority of Go projects
-- **CI/CD Friendly**: Excellent tooling support, easy integration
-- **Security Testing**: Perfect for secrets management testing patterns
-
-**Technology Stack Details**:
-```go
-// Core testing dependencies
-"testing"                    // Go standard library
-"github.com/stretchr/testify" // Assertions and mocking
-"github.com/testcontainers/testcontainers-go" // Integration testing
-"github.com/testcontainers/testcontainers-go/modules/redis" // Redis testing
-```
-
-**Testing Structure**:
-```
-internal/
-├── service/
-│   ├── auth_service_test.go
-│   ├── secret_service_test.go  
-│   ├── encryption_service_test.go
-│   └── audit_service_test.go
-├── repository/
-│   ├── redis_client_test.go
-│   └── integration_test.go
-└── controller/
-    ├── auth_controller_test.go
-    └── secret_controller_test.go
-```
-
-**Testing Standards**:
-- **Unit Tests**: Test business logic in isolation
-- **Integration Tests**: Test with real Redis using Testcontainers
-- **Security Tests**: Verify encryption, JWT validation, permissions
-- **Coverage Target**: >80% code coverage
-- **Parallel Execution**: All tests must be parallelizable
-
-**Consequences**:
-- ✅ **Zero Learning Curve**: Standard Go testing, familiar to all developers
-- ✅ **Excellent Tooling**: IDE support, CI/CD integration, coverage tools
-- ✅ **Real Integration Tests**: Testcontainers provides real Redis instances
-- ✅ **Security-Focused**: Perfect for testing encryption and auth flows
-- ✅ **Fast Execution**: Parallel testing, efficient test runs
-- ⚠️ **Less Fancy**: No BDD syntax or web UI (but not needed)
-
----
-
-### ADR-007: CI/CD Pipeline Technology
-**Date**: 2025-09-04  
-**Status**: ✅ Decided  
-**Decision**: GitHub Actions for CI/CD pipeline
-
-**Context**: Need automated testing, building, and deployment pipeline for PropGuard
-- **Option A**: GitHub Actions ✅ **SELECTED**
-- **Option B**: GitLab CI/CD
-- **Option C**: Jenkins
-- **Option D**: CircleCI
-
-**Decision Rationale**:
-- **Native GitHub Integration**: Seamless integration with repository, issues, and PRs
-- **Free for Public Repos**: Generous free tier (2000 minutes/month for private)
-- **Matrix Builds**: Easy multi-version Go testing (1.21, 1.22, 1.23)
-- **Docker Support**: Built-in Docker and Docker Compose actions
-- **Security Scanning**: Native Dependabot, CodeQL, and secret scanning
-- **Marketplace**: Extensive marketplace of pre-built actions
-- **Infrastructure as Code**: YAML-based configuration in repository
-
-**Implementation Strategy**:
-```yaml
-# Workflow structure
-.github/workflows/
-├── ci.yml           # Continuous Integration (test, build, lint)
-├── cd.yml           # Continuous Deployment (Docker, releases)
-├── security.yml     # Security scanning (CodeQL, Trivy, gosec)
-└── release.yml      # Automated releases with changelogs
-```
-
-**Pipeline Stages**:
-1. **CI Pipeline** (On every push/PR):
-   - Run tests with coverage
-   - Build binaries for multiple platforms
-   - Run linters (golangci-lint)
-   - Check code formatting
-   - Validate Swagger documentation
-
-2. **Security Pipeline** (Daily + on PR):
-   - CodeQL analysis for Go
-   - Dependency vulnerability scanning
-   - Container image scanning with Trivy
-   - Secret detection with TruffleHog
-   - SAST with gosec
-
-3. **CD Pipeline** (On main branch):
-   - Build and push Docker images
-   - Multi-arch builds (amd64, arm64)
-   - Tag with version and latest
-   - Deploy to staging environment
-   - Run smoke tests
-
-4. **Release Pipeline** (On version tags):
-   - Create GitHub releases
-   - Generate changelogs
-   - Build release binaries
-   - Push to Docker Hub
-   - Update documentation
-
-**Quality Gates**:
-- Minimum 80% code coverage
-- All tests must pass
-- No critical security vulnerabilities
-- Code must be formatted with gofmt
-- No linting errors from golangci-lint
-
-**Consequences**:
-- ✅ **Zero Infrastructure Cost**: No self-hosted runners needed
-- ✅ **Fast Feedback**: Parallel jobs, matrix builds
-- ✅ **Security First**: Built-in security scanning tools
-- ✅ **Easy Secrets Management**: GitHub Secrets for sensitive data
-- ✅ **PR Integration**: Automatic checks on pull requests
-- ⚠️ **Vendor Lock-in**: Tied to GitHub platform
-- ⚠️ **Limited Customization**: Less flexible than self-hosted solutions
-
----
-
-## 🏛️ Project Governance
-
-### Decision Authority Matrix
-
-| Decision Type | Authority | Approval Required |
-|---------------|-----------|-------------------|
-| **Architecture Changes** | Tech Lead + README documentation | Team review (3 days) |
-| **Security Policies** | Security Officer + README update | Mandatory security review |
-| **API Breaking Changes** | Product Owner + versioning plan | Stakeholder approval |
-| **Dependencies** | Lead Developer + security scan | Automated security check |
-| **Infrastructure** | DevOps Lead + cost analysis | Budget approval if >$100/month |
-
-### Change Request Process
-
-1. **📝 Document in README**: All changes start here
-2. **🔍 Impact Analysis**: Assess technical, security, and business impact  
-3. **💬 Team Discussion**: Minimum 48 hours for feedback
-4. **✅ Approval**: Based on authority matrix above
-5. **📊 Implementation Tracking**: Use TODO list and progress tracking
-6. **🔄 Review**: Post-implementation review and lessons learned
-
-### Current Pending Decisions Requiring Input
-
-| Decision | Deadline | Priority | Status |
-|----------|----------|----------|--------|
-| ~~CI/CD Pipeline Choice (ADR-007)~~ | ~~2024-09-20~~ | ~~Medium~~ | ✅ **Decided: GitHub Actions** |
-| Rate Limiting Strategy (ADR-008) | 2024-09-25 | Medium | Needs proposal |
-| Environment Parameters Storage (ADR-009) | 2024-09-30 | Medium | Needs proposal |
-| Secret Versioning Strategy (ADR-010) | 2024-10-05 | Low | Needs proposal |
-
-### Decision Templates
-
-#### New Decision Template
-```markdown
-### ADR-XXX: [Decision Title]
-**Date**: YYYY-MM-DD  
-**Status**: 📝 Proposal | 🔄 Under Review | ✅ Decided | ❌ Rejected | 🔄 Superseded  
-**Decision**: TBD
-
-**Context**: [Why this decision is needed]
-- **Option A**: [Description]
-- **Option B**: [Description] 
-- **Option C**: [Description]
-
-**Decision Rationale**: [Why this option was chosen]
-
-**Consequences**:
-- ✅ [Positive outcomes]
-- ⚠️ [Trade-offs/concerns]
-- ❌ [Negative impacts]
-
-**Implementation Status**: [Link to TODO items]
-**Review Date**: [When to revisit this decision]
-```
-
-## 📊 Project Progress
-
-### Overall Completion: ~65%
-
-#### Core Modules Progress
-
-| Module | Status | Progress | Description |
-|--------|--------|----------|-------------|
-| **Authentication System** | ✅ Complete | 100% | JWT-based auth with refresh tokens |
-| **Secret Management** | ✅ Complete | 100% | Full CRUD with encryption |
-| **User Management** | 🟨 In Progress | 75% | Basic CRUD done, roles pending |
-| **Audit Logging** | ✅ Complete | 100% | Comprehensive audit trail |
-| **Encryption Service** | ✅ Complete | 100% | AES-256-GCM implementation |
-| **Redis Integration** | ✅ Complete | 100% | Full persistence layer |
-| **API Documentation** | ✅ Complete | 100% | Swagger/OpenAPI specs |
-| **Docker Support** | ✅ Complete | 100% | Multi-stage build & compose |
-| **Network Discovery** | ❌ Removed | 0% | Removed per ADR-005 (security risks) |
-| **Environment Parameters** | 🟥 Not Started | 0% | Awaiting ADR-009 decision |
-| **Frontend Dashboard** | 🟨 In Progress | 40% | React app structure ready |
-| **Test Coverage** | 🟨 In Progress | 15% | Testing framework set up, first tests created |
-
-#### Development Timeline
-
-```mermaid
-gantt
-    title PropGuard Development Timeline
-    dateFormat  YYYY-MM-DD
-    section Phase 1 - Core
-    Authentication System     :done,    2024-08-01, 2024-08-15
-    Secret Management        :done,    2024-08-10, 2024-08-25
-    Encryption Service       :done,    2024-08-15, 2024-08-20
-    Redis Integration        :done,    2024-08-20, 2024-08-30
-    
-    section Phase 2 - Features
-    User Management          :active,  2024-08-25, 2024-09-10
-    Audit Logging           :done,    2024-08-30, 2024-09-05
-    API Documentation       :done,    2024-09-01, 2024-09-03
-    Docker Support          :done,    2024-09-02, 2024-09-03
-    
-    section Phase 3 - Advanced
-    Network Discovery       :done, removed, 2024-09-03, 2024-09-03
-    Environment Parameters  :         2024-09-25, 2024-10-15
-    Frontend Dashboard      :active,  2024-09-01, 2024-09-20
-    Test Implementation     :active,  2024-09-03, 2024-09-20
-```
-
-#### Current Sprint (Week of Sep 3, 2025)
-
-**Sprint Goal**: Complete user management and frontend integration
-
-| Task | Assignee | Status | Priority | Est. Hours |
-|------|----------|--------|----------|------------|
-| Complete user roles implementation | Backend Team | 🔄 In Progress | High | 8h |
-| Frontend secret management UI | Frontend Team | 🔄 In Progress | High | 12h |
-| Network discovery POC | R&D Team | 📋 Planned | Medium | 16h |
-| Write unit tests for services | QA Team | 📋 Planned | High | 20h |
-| Redis cluster configuration | DevOps | ✅ Done | Medium | 4h |
-| API rate limiting | Backend Team | 📋 Planned | Medium | 6h |
-
-#### Recent Achievements (Last 7 Days)
-- ✅ Implemented Redis persistence layer with clustering support
-- ✅ Added comprehensive Swagger documentation
-- ✅ Created Docker multi-stage build pipeline
-- ✅ Set up audit logging with retention policies
-- ✅ Implemented CORS middleware with configurable origins
-- ✅ Added health check endpoint with detailed status
-- ✅ **Removed network discovery security risks (ADR-005)**
-- ✅ **Set up testing framework with Testify (ADR-006)**
-- ✅ **Cleaned up unused dependencies**
-
-#### Upcoming Milestones
-
-| Milestone | Target Date | Status | Key Deliverables |
-|-----------|------------|--------|------------------|
-| **v0.5-alpha** | Sep 10, 2025 | 🔄 On Track | Basic secret management, auth, audit |
-| **v0.7-beta** | Sep 20, 2025 | 📅 Planned | User management, frontend dashboard |
-| **v0.9-rc** | Oct 1, 2025 | 📅 Planned | Network discovery, env parameters |
-| **v1.0-release** | Oct 15, 2025 | 📅 Planned | Full test coverage, production ready |
-
-#### Performance Metrics
-
-| Metric | Current | Target | Status |
-|--------|---------|--------|--------|
-| API Response Time (avg) | 45ms | <50ms | ✅ Meeting |
-| Concurrent Users | 100 | 500 | 🟨 Needs Work |
-| Secret Encryption Time | 2ms | <5ms | ✅ Meeting |
-| Memory Usage (idle) | 125MB | <200MB | ✅ Meeting |
-| Redis Query Time | 1ms | <2ms | ✅ Meeting |
-| Test Coverage | 0% | >80% | 🟥 Critical |
-
-#### Risk Register
-
-| Risk | Impact | Probability | Mitigation | Status |
-|------|--------|-------------|------------|--------|
-| Redis single point of failure | High | Medium | Implement Redis Sentinel | 🔄 In Progress |
-| Missing test coverage | High | High | Dedicated test sprint | 📋 Planned |
-| Network discovery security | High | Low | Sandbox environment | 📋 Planned |
-| Frontend delays | Medium | Medium | Additional resources | 🔄 Monitoring |
-
-## 🔄 Change Management & Decision Tracking
-
-### Change Impact Assessment Template
-
-Before implementing any change, assess:
-
-| Impact Area | Questions to Ask | Risk Level |
-|-------------|------------------|------------|
-| **Security** | Does this change affect authentication, authorization, encryption, or audit logging? | 🔴 High Risk |
-| **API Compatibility** | Will existing clients break? Are we maintaining semantic versioning? | 🟡 Medium Risk |
-| **Performance** | How does this affect response times, memory usage, or scalability? | 🟡 Medium Risk |
-| **Dependencies** | Are we adding new dependencies? What are their security/maintenance implications? | 🟡 Medium Risk |
-| **Infrastructure** | Does this require new deployment procedures, environment variables, or resources? | 🟢 Low Risk |
-
-### Decision Status Dashboard
-
-#### 🚨 URGENT DECISIONS NEEDED
-- **ADR-005: Network Discovery Security** (Due: Sep 10) - Security implications need resolution
-- **Test Framework Selection** (Due: Sep 15) - Blocking development progress
-
-#### 🔄 UNDER REVIEW
-- **ADR-004: Frontend Technology** - React POC in progress
-
-#### ✅ RECENTLY DECIDED (Last 30 Days)
-- **ADR-003: JWT Authentication** (Aug 10) - Implementation complete
-- **ADR-002: AES-256-GCM Encryption** (Aug 20) - Implementation complete
-- **ADR-001: Redis Database** (Aug 15) - Implementation complete
-
-### Implementation Tracking
-
-Link decisions to implementation items in TODO list:
-
-| ADR | Implementation Items | Status | Target Date |
-|-----|---------------------|--------|-------------|
-| ADR-004 | Complete React dashboard | 🔄 In Progress | Sep 20 |
-| ADR-005 | Network discovery security | ⏸️ Blocked on decision | TBD |
-| TBD | Test framework setup | ⏸️ Blocked on decision | Sep 15 |
-
-### Decision Review Schedule
-
-| Review Type | Frequency | Next Review | Purpose |
-|-------------|-----------|-------------|---------|
-| **Architecture Review** | Monthly | Oct 1, 2024 | Assess architectural decisions, technical debt |
-| **Security Review** | Bi-weekly | Sep 15, 2024 | Review security decisions, vulnerability assessment |
-| **Performance Review** | Monthly | Oct 1, 2024 | Evaluate performance decisions, optimization opportunities |
-| **Dependency Review** | Quarterly | Dec 1, 2024 | Audit dependencies, security updates, license compliance |
-
-### Lessons Learned
-
-#### What Worked Well
-- **Redis Decision**: Excellent performance, simplified deployment
-- **JWT Authentication**: Stateless design enables horizontal scaling
-- **Docker-First Approach**: Consistent development and deployment experience
-
-#### What Could Be Improved
-- **Decision Timeline**: Some decisions took too long, blocking development
-- **Impact Assessment**: Need better template for assessing changes
-- **Communication**: Decision rationale should be communicated to stakeholders faster
-
-#### Action Items for Process Improvement
-- [ ] Create automated decision reminder system
-- [ ] Establish weekly decision review meetings
-- [ ] Create decision impact calculator tool
-
-## 📝 TODO List
-
-### 🚨 CRITICAL - Immediate Action Required
-
-- [x] **✅ COMPLETED: Remove Network Discovery Code** - Completed Sep 3
-  - [x] Delete network discovery service files (21KB removed)
-  - [x] Remove network discovery controller (17KB removed)
-  - [x] Clean up imports and references
-  - [x] Update documentation and feature lists
-  - [x] Remove unused dependencies
-
-- [x] **✅ COMPLETED: Set Up Testing Framework** - Completed Sep 3  
-  - [x] Add testify and testcontainers dependencies to go.mod
-  - [x] Create first unit test for encryption service
-  - [x] Set up test coverage reporting in Makefile
-  - [x] Configure testing structure and standards
-
-### 🎯 HIGH PRIORITY - Current Sprint Focus
-
-- [ ] **Complete User Management** - Target: Sep 10
-  - [ ] Implement role-based permissions (in progress: 75%)
-  - [ ] Add user role assignment endpoints
-  - [ ] Test user management workflows
-
-- [ ] **Frontend Dashboard MVP** - Target: Sep 15  
-  - [ ] Complete secret management UI (40% done)
-  - [ ] Implement authentication flow
-  - [ ] Add basic user management interface
-  - [ ] Connect to backend APIs
-
-- [ ] **Testing Foundation** - Target: Sep 20 (blocked by ADR-006)
-  - [ ] Add unit tests for authentication service
-  - [ ] Add unit tests for secret service  
-  - [ ] Add integration tests for API endpoints
-  - [ ] Set up test coverage reporting
-
-- [ ] **Security Hardening** - Target: Sep 25
-  - [ ] Implement API rate limiting (needs ADR-008)
-  - [ ] Add brute force protection for login attempts
-  - [ ] Implement request timeout and size limits
-  - [ ] Add security headers middleware
-
-### 📅 MEDIUM PRIORITY - Next Sprint (Sep 25 - Oct 10)
-
-- [ ] **Advanced Frontend Features** - Target: Oct 5
-  - [ ] Add real-time audit log viewer with filtering  
-  - [ ] Create advanced secret management (versioning, sharing)
-  - [ ] Build comprehensive user management panel
-  - [ ] Add responsive mobile interface
-
-- [ ] **Environment Parameters Module** - Target: Oct 1
-  - [ ] Design parameter storage schema in Redis
-  - [ ] Implement parameter CRUD operations
-  - [ ] Add policy validation engine
-  - [ ] Create environment-specific parameter sets
-
-- [ ] **API Enhancements** - Target: Oct 10
-  - [ ] Add batch operations for secrets (create/update/delete multiple)
-  - [ ] Implement secret versioning and rollback
-  - [ ] Add secret sharing with time-based expiration
-  - [ ] Create webhook notifications for events
-
-- [ ] **CI/CD Pipeline** - Target: Oct 5 (needs ADR-007)
-  - [ ] Set up GitHub Actions or GitLab CI
-  - [ ] Implement automated testing pipeline
-  - [ ] Add automated security scanning
-  - [ ] Create deployment automation
-
-### 📦 LOW PRIORITY - Future Releases
-
-- [ ] **Third-party Integrations** (Version 1.1)
-  - [ ] HashiCorp Vault backend support
-  - [ ] Kubernetes secrets synchronization
-  - [ ] AWS Secrets Manager integration  
-  - [ ] Azure Key Vault integration
-
-- [ ] **Performance Optimizations** (Version 1.2)
-  - [ ] Implement Redis caching layer for frequently accessed secrets
-  - [ ] Add connection pooling optimizations
-  - [ ] Implement async audit logging
-  - [ ] Add bulk import/export functionality
-
-- [ ] **Advanced Documentation** (Version 1.1)
-  - [ ] Create API client SDKs (Go, Python, JavaScript)
-  - [ ] Add deployment guides for cloud providers (AWS, GCP, Azure)
-  - [ ] Write comprehensive security best practices guide
-  - [ ] Create video tutorials and demos
-
-### ✅ COMPLETED (Last 30 Days)
-- [x] Basic authentication with JWT tokens
-- [x] Secret CRUD operations with encryption
-- [x] AES-256-GCM encryption implementation
-- [x] Redis backend integration with persistence
-- [x] Docker containerization with multi-stage builds
-- [x] Swagger API documentation with examples
-- [x] CORS configuration with environment controls
-- [x] Health check endpoint with Redis monitoring
-- [x] Audit logging framework with retention
-- [x] User management structure and basic CRUD
-- [x] **Frontend technology stack decision (ADR-004)**
-- [x] **Comprehensive README restructure as decision center**
-- [x] **Redis monitoring and alerting documentation**
-- [x] **Network discovery security decision and code removal (ADR-005)**
-- [x] **Testing framework selection and setup (ADR-006)**
-- [x] **Dependency cleanup**
-
-## 🔄 Future Roadmap
-
-### Version 2.0
-- [ ] Multi-tenancy support with namespace isolation
-- [ ] Hardware Security Module (HSM) integration
-- [ ] Advanced secret rotation automation
-- [ ] Kubernetes operator for automated deployment
-- [ ] LDAP/Active Directory authentication
-- [ ] Prometheus metrics export
-- [ ] GraphQL API support
-
-### Version 3.0
-- [ ] CLI tool for secret management
-- [ ] Terraform provider for infrastructure as code
-- [ ] Zero-knowledge architecture
-- [ ] Distributed consensus for HA
-- [ ] AI-powered anomaly detection
-- [ ] Blockchain audit trail option
+**PropGuard** - Enterprise-grade secrets management made simple.

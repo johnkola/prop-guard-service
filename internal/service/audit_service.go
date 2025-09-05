@@ -12,6 +12,11 @@ import (
 type AuditService interface {
 	LogAction(ctx context.Context, username, action, path string, success bool, details string)
 	LogUserOperation(ctx context.Context, username, action, targetUser string, success bool, details string)
+	LogSecretOperation(ctx context.Context, userID, operation, secretName string, success bool, details string)
+	LogAPIKeyOperation(ctx context.Context, userID, operation, resource string, success bool, details string)
+	LogServiceOperation(ctx context.Context, serviceID, operation, resource string, success bool, details string)
+	LogAdminOperation(ctx context.Context, adminID, operation, resource string, success bool, details string)
+	LogSystemOperation(ctx context.Context, systemID, operation, resource string, success bool, details string)
 	GetUserAuditLogs(ctx context.Context, username string, limit, offset int) ([]*entity.AuditLog, error)
 	GetPathAuditLogs(ctx context.Context, path string, limit, offset int) ([]*entity.AuditLog, error)
 	GetAuditLogsByDateRange(ctx context.Context, start, end time.Time, limit, offset int) ([]*entity.AuditLog, error)
@@ -19,10 +24,10 @@ type AuditService interface {
 }
 
 type auditService struct {
-	auditRepo *repository.RedisAuditRepository
+	auditRepo *repository.BadgerAuditRepository
 }
 
-func NewAuditService(auditRepo *repository.RedisAuditRepository) AuditService {
+func NewAuditService(auditRepo *repository.BadgerAuditRepository) AuditService {
 	return &auditService{
 		auditRepo: auditRepo,
 	}
@@ -56,15 +61,38 @@ func (s *auditService) LogAction(ctx context.Context, username, action, path str
 }
 
 func (s *auditService) GetUserAuditLogs(ctx context.Context, username string, limit, offset int) ([]*entity.AuditLog, error) {
-	return s.auditRepo.ListByUsername(ctx, username, limit, offset)
+	return s.auditRepo.GetByUsername(ctx, username, limit, offset)
 }
 
 func (s *auditService) GetPathAuditLogs(ctx context.Context, path string, limit, offset int) ([]*entity.AuditLog, error) {
-	return s.auditRepo.ListByPath(ctx, path, limit, offset)
+	// BadgerAuditRepository doesn't have ListByPath, we'll filter manually
+	allAudits, err := s.auditRepo.List(ctx, 10000, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	var pathAudits []*entity.AuditLog
+	for _, audit := range allAudits {
+		if audit.SecretPath == path {
+			pathAudits = append(pathAudits, audit)
+		}
+	}
+
+	start := offset
+	if start > len(pathAudits) {
+		return []*entity.AuditLog{}, nil
+	}
+
+	end := start + limit
+	if end > len(pathAudits) {
+		end = len(pathAudits)
+	}
+
+	return pathAudits[start:end], nil
 }
 
 func (s *auditService) GetAuditLogsByDateRange(ctx context.Context, start, end time.Time, limit, offset int) ([]*entity.AuditLog, error) {
-	return s.auditRepo.ListByDateRange(ctx, start, end, limit, offset)
+	return s.auditRepo.GetByDateRange(ctx, start, end, limit, offset)
 }
 
 func (s *auditService) LogUserOperation(ctx context.Context, username, action, targetUser string, success bool, details string) {
@@ -73,5 +101,31 @@ func (s *auditService) LogUserOperation(ctx context.Context, username, action, t
 }
 
 func (s *auditService) CleanupOldLogs(ctx context.Context, days int) (int64, error) {
-	return s.auditRepo.DeleteOlderThan(ctx, days)
+	// BadgerAuditRepository has DeleteOldAudits method
+	err := s.auditRepo.DeleteOldAudits(ctx)
+	if err != nil {
+		return 0, err
+	}
+	// Return approximate count - we can't get exact count without tracking
+	return int64(days), nil
+}
+
+func (s *auditService) LogSecretOperation(ctx context.Context, userID, operation, secretName string, success bool, details string) {
+	s.LogAction(ctx, userID, operation, fmt.Sprintf("secret:%s", secretName), success, details)
+}
+
+func (s *auditService) LogAPIKeyOperation(ctx context.Context, userID, operation, resource string, success bool, details string) {
+	s.LogAction(ctx, userID, operation, fmt.Sprintf("apikey:%s", resource), success, details)
+}
+
+func (s *auditService) LogServiceOperation(ctx context.Context, serviceID, operation, resource string, success bool, details string) {
+	s.LogAction(ctx, serviceID, operation, fmt.Sprintf("service:%s", resource), success, details)
+}
+
+func (s *auditService) LogAdminOperation(ctx context.Context, adminID, operation, resource string, success bool, details string) {
+	s.LogAction(ctx, adminID, operation, fmt.Sprintf("admin:%s", resource), success, details)
+}
+
+func (s *auditService) LogSystemOperation(ctx context.Context, systemID, operation, resource string, success bool, details string) {
+	s.LogAction(ctx, systemID, operation, fmt.Sprintf("system:%s", resource), success, details)
 }

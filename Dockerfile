@@ -41,8 +41,9 @@ WORKDIR /app
 # Copy binary from builder
 COPY --from=builder /app/propguard .
 
-# Change ownership
-RUN chown -R propguard:propguard /app
+# Create data directory and set permissions
+RUN mkdir -p /app/data && \
+    chown -R propguard:propguard /app
 
 # Switch to non-root user
 USER propguard

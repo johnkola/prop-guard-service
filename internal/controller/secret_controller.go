@@ -7,6 +7,7 @@ import (
 	"PropGuard/internal/dto"
 	"PropGuard/internal/security"
 	"PropGuard/internal/service"
+
 	"github.com/gin-gonic/gin"
 )
 
@@ -174,7 +175,7 @@ func (c *SecretController) DeleteSecret(ctx *gin.Context) {
 // @Security BearerAuth
 // @Param limit query int false "Limit results" default(20)
 // @Param offset query int false "Offset for pagination" default(0)
-// @Success 200 {array} dto.SecretResponse
+// @Success 200 {object} dto.PaginatedSecretsResponse
 // @Failure 401 {object} map[string]string
 // @Router /secrets [get]
 func (c *SecretController) ListSecrets(ctx *gin.Context) {
@@ -194,11 +195,11 @@ func (c *SecretController) ListSecrets(ctx *gin.Context) {
 	// TODO: Get namespace from context
 	namespace := "default"
 
-	secrets, err := c.secretService.ListSecrets(ctx, namespace, limit, offset)
+	paginatedSecrets, err := c.secretService.ListSecretsPaginated(ctx, namespace, limit, offset)
 	if err != nil {
 		ctx.JSON(http.StatusInternalServerError, gin.H{"error": err.Error()})
 		return
 	}
 
-	ctx.JSON(http.StatusOK, secrets)
+	ctx.JSON(http.StatusOK, paginatedSecrets)
 }

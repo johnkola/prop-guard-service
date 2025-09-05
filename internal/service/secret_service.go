@@ -9,6 +9,7 @@ import (
 	"PropGuard/internal/dto"
 	"PropGuard/internal/entity"
 	"PropGuard/internal/repository"
+
 	"github.com/google/uuid"
 )
 
@@ -18,18 +19,19 @@ type SecretService interface {
 	UpdateSecret(ctx context.Context, path string, request *dto.SecretRequest, username string) (*dto.SecretResponse, error)
 	DeleteSecret(ctx context.Context, namespace, path string, username string) error
 	ListSecrets(ctx context.Context, namespace string, limit, offset int) ([]*dto.SecretResponse, error)
+	ListSecretsPaginated(ctx context.Context, namespace string, limit, offset int) (*dto.PaginatedSecretsResponse, error)
 }
 
 type secretService struct {
-	secretRepo        *repository.RedisSecretRepository
-	userRepo          *repository.RedisUserRepository
+	secretRepo        *repository.BadgerSecretRepository
+	userRepo          *repository.BadgerUserRepository
 	encryptionService EncryptionService
 	auditService      AuditService
 }
 
 func NewSecretService(
-	secretRepo *repository.RedisSecretRepository,
-	userRepo *repository.RedisUserRepository,
+	secretRepo *repository.BadgerSecretRepository,
+	userRepo *repository.BadgerUserRepository,
 	encryptionService EncryptionService,
 	auditService AuditService,
 ) SecretService {
@@ -50,7 +52,7 @@ func (s *secretService) CreateSecret(ctx context.Context, path string, request *
 	namespace := "default"
 
 	// Check if secret already exists
-	existing, _ := s.secretRepo.FindByPath(ctx, namespace, path)
+	existing, _ := s.secretRepo.GetByPath(ctx, path)
 	if existing != nil {
 		s.auditService.LogAction(ctx, username, "CREATE_SECRET", namespace+":"+path, false, "Secret already exists")
 		return nil, fmt.Errorf("secret already exists at path: %s in namespace: %s", path, namespace)
@@ -102,7 +104,7 @@ func (s *secretService) GetSecret(ctx context.Context, namespace, path string) (
 		return nil, err
 	}
 
-	secret, err := s.secretRepo.FindByPath(ctx, namespace, path)
+	secret, err := s.secretRepo.GetByPath(ctx, path)
 	if err != nil {
 		return nil, err
 	}
@@ -130,7 +132,7 @@ func (s *secretService) UpdateSecret(ctx context.Context, path string, request *
 	namespace := "default" // Should come from network context
 
 	// Get existing secret
-	existingSecret, err := s.secretRepo.FindByPath(ctx, namespace, path)
+	existingSecret, err := s.secretRepo.GetByPath(ctx, path)
 	if err != nil {
 		s.auditService.LogAction(ctx, username, "UPDATE_SECRET", path, false, "Secret not found")
 		return nil, fmt.Errorf("secret not found at path: %s", path)
@@ -183,13 +185,13 @@ func (s *secretService) DeleteSecret(ctx context.Context, namespace, path string
 		return err
 	}
 
-	secret, err := s.secretRepo.FindByPath(ctx, namespace, path)
+	_, err := s.secretRepo.GetByPath(ctx, path)
 	if err != nil {
 		s.auditService.LogAction(ctx, username, "DELETE_SECRET", path, false, "Secret not found")
 		return fmt.Errorf("secret not found at path: %s", path)
 	}
 
-	if err := s.secretRepo.Delete(ctx, secret.ID); err != nil {
+	if err := s.secretRepo.Delete(ctx, path); err != nil {
 		s.auditService.LogAction(ctx, username, "DELETE_SECRET", path, false, err.Error())
 		return err
 	}
@@ -199,10 +201,27 @@ func (s *secretService) DeleteSecret(ctx context.Context, namespace, path string
 }
 
 func (s *secretService) ListSecrets(ctx context.Context, namespace string, limit, offset int) ([]*dto.SecretResponse, error) {
-	secrets, err := s.secretRepo.ListByNamespace(ctx, namespace, limit, offset)
+	// BadgerDB doesn't have ListByNamespace, use List and filter manually
+	allSecrets, err := s.secretRepo.List(ctx, 10000, 0)
 	if err != nil {
 		return nil, err
 	}
+
+	// Filter by namespace (for now we'll use all secrets since namespace handling is basic)
+	secrets := allSecrets
+
+	// Apply pagination manually
+	start := offset
+	if start > len(secrets) {
+		return []*dto.SecretResponse{}, nil
+	}
+
+	end := start + limit
+	if end > len(secrets) {
+		end = len(secrets)
+	}
+
+	secrets = secrets[start:end]
 
 	responses := make([]*dto.SecretResponse, 0, len(secrets))
 	for _, secret := range secrets {
@@ -255,4 +274,61 @@ func (s *secretService) mapToResponse(secret *entity.Secret, data map[string]int
 		Version:   secret.Version,
 		ExpiresAt: secret.ExpiresAt,
 	}
+}
+
+func (s *secretService) ListSecretsPaginated(ctx context.Context, namespace string, limit, offset int) (*dto.PaginatedSecretsResponse, error) {
+	// BadgerDB doesn't have ListByNamespace, use List and get total count first
+	allSecrets, err := s.secretRepo.List(ctx, 10000, 0)
+	if err != nil {
+		return nil, err
+	}
+
+	// Filter by namespace (for now we'll use all secrets since namespace handling is basic)
+	secrets := allSecrets
+	totalCount := len(secrets)
+
+	// Apply pagination manually
+	start := offset
+	if start > len(secrets) {
+		secrets = []*entity.Secret{}
+	} else {
+		end := start + limit
+		if end > len(secrets) {
+			end = len(secrets)
+		}
+		secrets = secrets[start:end]
+	}
+
+	// Convert to response DTOs
+	responses := make([]*dto.SecretResponse, 0, len(secrets))
+	for _, secret := range secrets {
+		// For list operations, we don't decrypt the actual data
+		response := &dto.SecretResponse{
+			Path:      secret.Path,
+			CreatedAt: secret.CreatedAt,
+			UpdatedAt: secret.UpdatedAt,
+			CreatedBy: secret.CreatedBy,
+			UpdatedBy: secret.UpdatedBy,
+			Version:   secret.Version,
+			ExpiresAt: secret.ExpiresAt,
+		}
+		responses = append(responses, response)
+	}
+
+	// Calculate pagination info
+	page := (offset / limit) + 1
+	totalPages := (totalCount + limit - 1) / limit
+	if totalPages == 0 {
+		totalPages = 1
+	}
+
+	return &dto.PaginatedSecretsResponse{
+		Secrets:    responses,
+		Total:      totalCount,
+		Page:       page,
+		PageSize:   limit,
+		TotalPages: totalPages,
+		HasNext:    page < totalPages,
+		HasPrev:    page > 1,
+	}, nil
 }

@@ -17,6 +17,7 @@ import (
 	"PropGuard/internal/repository"
 	"PropGuard/internal/security"
 	"PropGuard/internal/service"
+
 	"github.com/gin-gonic/gin"
 	swaggerFiles "github.com/swaggo/files"
 	ginSwagger "github.com/swaggo/gin-swagger"
@@ -24,7 +25,7 @@ import (
 
 // @title PropGuard API
 // @version 1.0
-// @description A secure secrets management system
+// @description A secure secrets management system with BadgerDB
 // @termsOfService http://swagger.io/terms/
 
 // @contact.name API Support
@@ -48,55 +49,58 @@ func main() {
 		log.Fatalf("Failed to load configuration: %v", err)
 	}
 
-	// Connect to Redis
-	redisConfig := repository.RedisConfig{
-		Host:               cfg.Redis.Host,
-		Port:               cfg.Redis.Port,
-		Password:           cfg.Redis.Password,
-		Database:           cfg.Redis.Database,
-		MaxRetries:         cfg.Redis.MaxRetries,
-		PoolSize:           cfg.Redis.PoolSize,
-		MinIdleConns:       cfg.Redis.MinIdleConns,
-		DialTimeout:        cfg.Redis.DialTimeout,
-		ReadTimeout:        cfg.Redis.ReadTimeout,
-		WriteTimeout:       cfg.Redis.WriteTimeout,
-		PoolTimeout:        cfg.Redis.PoolTimeout,
-		IdleTimeout:        cfg.Redis.IdleTimeout,
-		IdleCheckFrequency: cfg.Redis.IdleCheckFrequency,
-		MaxConnAge:         cfg.Redis.MaxConnAge,
-		TLSEnabled:         cfg.Redis.TLSEnabled,
-		PersistenceEnabled: cfg.Redis.PersistenceEnabled,
-		AOFEnabled:         cfg.Redis.AOFEnabled,
-		RDBEnabled:         cfg.Redis.RDBEnabled,
-		RDBSaveInterval:    cfg.Redis.RDBSaveInterval,
-		ClusterEnabled:     cfg.Redis.ClusterEnabled,
-		ClusterNodes:       cfg.Redis.ClusterNodes,
-		MasterName:         cfg.Redis.MasterName,
-		SentinelAddresses:  cfg.Redis.SentinelAddresses,
+	// Initialize BadgerDB
+	badgerConfig := repository.BadgerConfig{
+		Dir:                cfg.Badger.Dir,
+		ValueLogFileSize:   cfg.Badger.ValueLogFileSize,
+		MemTableSize:       cfg.Badger.MemTableSize,
+		BlockCacheSize:     cfg.Badger.BlockCacheSize,
+		IndexCacheSize:     cfg.Badger.IndexCacheSize,
+		NumVersionsToKeep:  cfg.Badger.NumVersionsToKeep,
+		NumLevelZeroTables: cfg.Badger.NumLevelZeroTables,
+		Compression:        cfg.Badger.Compression,
 	}
 
-	redisClient, err := repository.NewRedisClient(redisConfig)
+	// Add encryption key if encryption is enabled
+	if cfg.Badger.EncryptionEnabled {
+		badgerConfig.EncryptionKey = []byte(cfg.Vault.MasterKey)
+	}
+
+	badgerClient, err := repository.NewBadgerClient(badgerConfig)
 	if err != nil {
-		log.Fatalf("Failed to connect to Redis: %v", err)
+		log.Fatalf("Failed to connect to BadgerDB: %v", err)
 	}
 	defer func() {
-		ctx, cancel := context.WithTimeout(context.Background(), 10*time.Second)
-		defer cancel()
-		if err := redisClient.Disconnect(ctx); err != nil {
-			log.Printf("Error disconnecting from Redis: %v", err)
+		if err := badgerClient.Close(); err != nil {
+			log.Printf("Error closing BadgerDB: %v", err)
 		}
 	}()
 
-	// Test Redis connection
-	if err := redisClient.Ping(); err != nil {
-		log.Fatalf("Redis health check failed: %v", err)
+	// Test BadgerDB connection
+	if err := badgerClient.Ping(); err != nil {
+		log.Fatalf("BadgerDB health check failed: %v", err)
 	}
-	log.Println("Redis connection established successfully")
+	log.Println("BadgerDB connection established successfully")
+
+	// Context for operations
+	ctx := context.Background()
+	log.Println("PropGuard system starting with BadgerDB backend")
+
+	// Bootstrap system if needed
+	bootstrapService := service.NewBootstrapServiceBadger(badgerClient, cfg)
+	if isFirstRun, _ := bootstrapService.IsFirstRun(ctx); isFirstRun {
+		log.Println("🚀 First run detected - bootstrapping...")
+		if err := bootstrapService.RunBootstrap(ctx); err != nil {
+			log.Fatalf("Bootstrap failed: %v", err)
+		}
+	}
 
 	// Initialize repositories
-	userRepo := repository.NewRedisUserRepository(redisClient)
-	secretRepo := repository.NewRedisSecretRepository(redisClient)
-	auditRepo := repository.NewRedisAuditRepository(redisClient, cfg.Vault.AuditRetentionDays)
+	userRepo := repository.NewBadgerUserRepository(badgerClient)
+	secretRepo := repository.NewBadgerSecretRepository(badgerClient)
+	auditRepo := repository.NewBadgerAuditRepository(badgerClient, cfg.Vault.AuditRetentionDays)
+	// apiKeyRepo := repository.NewBadgerAPIKeyRepository(badgerClient) // Removed - service not used
+	roleRepo := repository.NewBadgerRoleRepository(badgerClient)
 
 	// Initialize services
 	encryptionService := service.NewEncryptionService(cfg.Vault.MasterKey)
@@ -104,8 +108,7 @@ func main() {
 	authService := service.NewAuthService(userRepo, auditService, cfg.JWT.Secret, cfg.JWT.ExpiryHours)
 	secretService := service.NewSecretService(secretRepo, userRepo, encryptionService, auditService)
 	userService := service.NewUserService(userRepo, auditService)
-
-	// Network discovery removed per ADR-005 (security risks)
+	// envParamService := service.NewEnvParamService() // Removed - service not used
 
 	// Initialize middleware
 	jwtMiddleware := security.NewJWTMiddleware(authService)
@@ -114,10 +117,12 @@ func main() {
 	authController := controller.NewAuthController(authService)
 	secretController := controller.NewSecretController(secretService, jwtMiddleware)
 	userController := controller.NewUserController(userService, jwtMiddleware)
-	// Network discovery controller removed per ADR-005
+	roleController := controller.NewRoleController(roleRepo, auditService, jwtMiddleware)
+	auditController := controller.NewAuditController(auditRepo, auditService, jwtMiddleware)
+	// Batch keys controller removed - dependencies not available
 
 	// Setup Gin router
-	router := setupRouter(authController, secretController, userController, redisClient)
+	router := setupRouter(authController, secretController, userController, roleController, auditController, badgerClient)
 
 	// Create HTTP server
 	srv := &http.Server{
@@ -152,7 +157,7 @@ func main() {
 	log.Println("Server shutdown complete")
 }
 
-func setupRouter(authController *controller.AuthController, secretController *controller.SecretController, userController *controller.UserController, redisClient *repository.RedisClient) *gin.Engine {
+func setupRouter(authController *controller.AuthController, secretController *controller.SecretController, userController *controller.UserController, roleController *controller.RoleController, auditController *controller.AuditController, badgerClient *repository.BadgerClient) *gin.Engine {
 	// Set Gin mode based on environment
 	if os.Getenv("GIN_MODE") == "" {
 		gin.SetMode(gin.ReleaseMode)
@@ -165,26 +170,25 @@ func setupRouter(authController *controller.AuthController, secretController *co
 	router.Use(gin.Logger())
 	router.Use(corsMiddleware())
 
-	// Enhanced health check endpoint for Docker deployment
+	// Enhanced health check endpoint
 	router.GET("/health", func(c *gin.Context) {
+		stats := badgerClient.GetStats()
 		healthStatus := gin.H{
 			"status":      "healthy",
 			"time":        time.Now().Unix(),
 			"environment": os.Getenv("GIN_MODE"),
-			"docker":      os.Getenv("REDIS_HOST") != "",
+			"database":    "BadgerDB",
+			"db_stats":    stats,
 		}
 
-		// Test Redis connectivity
-		if redisClient != nil {
-			if err := redisClient.Ping(); err != nil {
-				healthStatus["redis"] = "unhealthy"
-				healthStatus["redis_error"] = err.Error()
-				c.JSON(http.StatusServiceUnavailable, healthStatus)
-				return
-			}
-			healthStatus["redis"] = "healthy"
-			healthStatus["redis_host"] = os.Getenv("REDIS_HOST")
+		// Test BadgerDB connectivity
+		if err := badgerClient.Ping(); err != nil {
+			healthStatus["database_status"] = "unhealthy"
+			healthStatus["database_error"] = err.Error()
+			c.JSON(http.StatusServiceUnavailable, healthStatus)
+			return
 		}
+		healthStatus["database_status"] = "healthy"
 
 		// Add service info
 		healthStatus["service"] = "PropGuard API"
@@ -259,7 +263,9 @@ func setupRouter(authController *controller.AuthController, secretController *co
 		authController.RegisterRoutes(v1)
 		secretController.RegisterRoutes(v1)
 		userController.RegisterRoutes(v1)
-		// Network discovery routes removed per ADR-005
+		roleController.RegisterRoutes(v1)
+		auditController.RegisterRoutes(v1)
+		// Batch keys routes removed - service dependencies not available
 	}
 
 	return router
