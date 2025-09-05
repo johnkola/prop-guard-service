@@ -1,0 +1,70 @@
+# Git
+.git
+.gitignore
+
+# Build artifacts
+bin/
+*.exe
+*.dll
+*.so
+*.dylib
+
+# Test binary, built with `go test -c`
+*.test
+
+# Output of the go coverage tool
+*.out
+coverage.html
+
+# Dependency directories
+vendor/
+node_modules/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Docker
+Dockerfile
+docker-compose*.yml
+
+# Documentation
+*.md
+docs/
+
+# Temporary files
+*.tmp
+*.bak
+
+# Logs
+*.log
+
+# Environment files
+.env*
+
+# Frontend build
+ui/dashboard/node_modules/
+ui/dashboard/.next/
+ui/dashboard/out/
+ui/dashboard/dist/
+
+# Examples and scripts
+examples/
+scripts/
+
+# Redis data
+redis-persistence.conf
+redis.conf
+
+# Large files that shouldn't be in Docker context
+*.iso
+*.img
+*.tar
+*.gz
+*.zip

@@ -5,7 +5,9 @@
 *.so
 *.dylib
 propguard
-propguard.exe
+propguard-*
+main
+server
 
 # Test binary, built with `go test -c`
 *.test
@@ -46,3 +48,18 @@ logs/
 
 # Docker
 docker-data/
+
+# Data directories
+/data/
+/badger-data/
+*.db
+
+# Frontend build
+ui/dashboard/.next/
+ui/dashboard/out/
+ui/dashboard/node_modules/
+
+# Temporary/test files
+/tmp/
+*.tmp
+*.temp

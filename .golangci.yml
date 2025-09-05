@@ -1,0 +1,225 @@
+# golangci-lint configuration for PropGuard
+
+run:
+  timeout: 5m
+  tests: true
+  build-tags:
+    - integration
+  skip-dirs:
+    - docs
+    - bin
+    - vendor
+  skip-files:
+    - ".*_test.go"  # Can be removed when we want to lint test files
+
+output:
+  format: colored-line-number
+  print-issued-lines: true
+  print-linter-name: true
+
+linters:
+  enable:
+    # Default linters
+    - errcheck      # Checking for unchecked errors
+    - gosimple      # Simplifying code
+    - govet         # Vet examines Go source code
+    - ineffassign   # Detects ineffective assignments
+    - staticcheck   # Static analysis
+    - typecheck     # Type checking
+    - unused        # Checks for unused code
+    
+    # Additional linters for code quality
+    - bodyclose     # Checks HTTP response body is closed
+    - dupl          # Code duplication detection
+    - exportloopref # Checks for pointers to enclosing loop variables
+    - gocognit      # Cognitive complexity checker
+    - goconst       # Find repeated strings that could be constants
+    - gocritic      # Opinionated Go source code linter
+    - gocyclo       # Cyclomatic complexity checker
+    - gofmt         # Gofmt checks formatting
+    - goimports     # Goimports checks imports
+    - gosec         # Security checker
+    - misspell      # Spell checker
+    - nakedret      # Naked returns checker
+    - prealloc      # Find slice declarations that could be preallocated
+    - revive        # Drop-in replacement for golint
+    - unconvert     # Unnecessary type conversions
+    - unparam       # Unused function parameters
+    
+    # Style linters
+    - dogsled       # Checks assignments with too many blank identifiers
+    - whitespace    # Whitespace checks
+    - wsl           # Whitespace linter
+    
+    # Bug detection
+    - asciicheck    # Non-ASCII identifier checker
+    - bidichk       # Bidirectional text characters checker
+    - durationcheck # Duration multiplication checker
+    - errorlint     # Error wrapping checker
+    - forcetypeassert # Unchecked type assertions
+    - nilerr        # Incorrect nil error returns
+    
+  disable:
+    - deadcode      # Deprecated
+    - exhaustruct   # Too strict for our use case
+    - gochecknoglobals # We use some globals for configuration
+    - gochecknoinits   # Init functions are sometimes necessary
+    - godox         # We want to keep TODO/FIXME comments
+    - golint        # Deprecated, using revive instead
+    - interfacer    # Deprecated
+    - maligned      # Deprecated
+    - nlreturn      # Too opinionated
+    - scopelint     # Deprecated
+    - structcheck   # Deprecated
+    - varcheck      # Deprecated
+    - wrapcheck     # Too strict for our error handling
+
+linters-settings:
+  errcheck:
+    check-type-assertions: true
+    check-blank: false
+    ignore: fmt:.*,io/ioutil:^Read.*
+    
+  govet:
+    check-shadowing: true
+    enable-all: true
+    
+  gocyclo:
+    min-complexity: 15
+    
+  dupl:
+    threshold: 100
+    
+  goconst:
+    min-len: 3
+    min-occurrences: 3
+    
+  misspell:
+    locale: US
+    
+  gosec:
+    severity: medium
+    confidence: medium
+    excludes:
+      - G104  # Unhandled errors (covered by errcheck)
+      - G304  # File path traversal (we need this for file operations)
+    
+  goimports:
+    local-prefixes: github.com/yourusername/prop-guard-service
+    
+  gocognit:
+    min-complexity: 20
+    
+  gocritic:
+    enabled-tags:
+      - diagnostic
+      - experimental
+      - opinionated
+      - performance
+      - style
+    disabled-checks:
+      - commentedOutCode
+      - whyNoLint
+      
+  revive:
+    confidence: 0.8
+    severity: warning
+    rules:
+      - name: blank-imports
+      - name: context-as-argument
+      - name: context-keys-type
+      - name: dot-imports
+      - name: error-return
+      - name: error-strings
+      - name: error-naming
+      - name: if-return
+      - name: increment-decrement
+      - name: var-naming
+      - name: package-comments
+      - name: range
+      - name: receiver-naming
+      - name: time-naming
+      - name: unexported-return
+      - name: indent-error-flow
+      - name: errorf
+      
+  staticcheck:
+    go: "1.23"
+    checks: ["all", "-ST1000", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022"]
+    
+  stylecheck:
+    go: "1.23"
+    checks: ["all", "-ST1000", "-ST1003", "-ST1016", "-ST1020", "-ST1021", "-ST1022"]
+    
+  unparam:
+    check-exported: false
+    
+  unused:
+    go: "1.23"
+    
+  whitespace:
+    multi-if: true
+    multi-func: true
+    
+  wsl:
+    allow-cuddle-declarations: false
+    allow-multiline-assign: true
+    allow-separated-leading-comment: false
+    force-case-trailing-whitespace: 0
+    force-err-cuddling: false
+    force-short-decl-cuddling: false
+    strict-append: true
+
+issues:
+  exclude-use-default: false
+  max-issues-per-linter: 0
+  max-same-issues: 0
+  new: false
+  
+  exclude-rules:
+    # Exclude some linters from running on tests files
+    - path: _test\.go
+      linters:
+        - gocyclo
+        - errcheck
+        - dupl
+        - gosec
+        - gocognit
+        
+    # Exclude known issues in generated files
+    - path: docs/.*\.go
+      linters:
+        - all
+        
+    # Exclude certain patterns
+    - text: "weak cryptographic primitive"
+      linters:
+        - gosec
+        
+    # Allow context.Background() in main
+    - path: cmd/.*\.go
+      linters:
+        - forbidigo
+        
+    # Allow global variables in config
+    - path: internal/config/.*\.go
+      linters:
+        - gochecknoglobals
+        
+  # Show all issues from a linter
+  exclude-case-sensitive: false
+  include: []
+  
+  # Fix found issues (if it's supported by the linter)
+  fix: false
+
+severity:
+  default-severity: warning
+  case-sensitive: false
+  rules:
+    - linters:
+        - gosec
+      severity: error
+    - linters:
+        - dupl
+      severity: info

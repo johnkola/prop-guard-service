@@ -1,0 +1,266 @@
+name: Release Pipeline
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Release version (e.g., v1.0.0)'
+        required: true
+        type: string
+      release_type:
+        description: 'Release type'
+        required: true
+        type: choice
+        options:
+          - patch
+          - minor
+          - major
+          - prerelease
+
+permissions:
+  contents: write
+  packages: write
+  pull-requests: write
+
+jobs:
+  prepare-release:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Configure Git
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+
+      - name: Determine version
+        id: version
+        run: |
+          if [ -n "${{ github.event.inputs.version }}" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+          else
+            # Auto-increment version based on release type
+            LATEST_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0")
+            VERSION=${LATEST_TAG#v}
+            
+            IFS='.' read -r major minor patch <<< "$VERSION"
+            
+            case "${{ github.event.inputs.release_type }}" in
+              major)
+                major=$((major + 1))
+                minor=0
+                patch=0
+                ;;
+              minor)
+                minor=$((minor + 1))
+                patch=0
+                ;;
+              patch)
+                patch=$((patch + 1))
+                ;;
+              prerelease)
+                patch=$((patch + 1))
+                VERSION="v${major}.${minor}.${patch}-rc.1"
+                ;;
+            esac
+            
+            if [ "${{ github.event.inputs.release_type }}" != "prerelease" ]; then
+              VERSION="v${major}.${minor}.${patch}"
+            fi
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Release version: $VERSION"
+
+      - name: Update version in files
+        run: |
+          # Update version in go.mod comments or version files if they exist
+          echo "${{ steps.version.outputs.version }}" > VERSION
+          
+          # Update version in README if it contains version badges
+          sed -i "s/version-v[0-9.]*/version-${{ steps.version.outputs.version }}/" README.md || true
+
+      - name: Generate comprehensive changelog
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 2>/dev/null || echo "")
+          
+          cat > CHANGELOG_RELEASE.md << 'EOF'
+          # Release ${{ steps.version.outputs.version }}
+          
+          ## 🎉 Highlights
+          
+          EOF
+          
+          # Add commit summary
+          if [ -n "$PREVIOUS_TAG" ]; then
+            echo "## 📝 Changes since $PREVIOUS_TAG" >> CHANGELOG_RELEASE.md
+            echo "" >> CHANGELOG_RELEASE.md
+            
+            # Features
+            echo "### ✨ Features" >> CHANGELOG_RELEASE.md
+            git log ${PREVIOUS_TAG}..HEAD --grep="feat:" --pretty=format:"* %s (%h)" >> CHANGELOG_RELEASE.md || echo "* No new features" >> CHANGELOG_RELEASE.md
+            echo "" >> CHANGELOG_RELEASE.md
+            
+            # Bug Fixes
+            echo "### 🐛 Bug Fixes" >> CHANGELOG_RELEASE.md
+            git log ${PREVIOUS_TAG}..HEAD --grep="fix:" --pretty=format:"* %s (%h)" >> CHANGELOG_RELEASE.md || echo "* No bug fixes" >> CHANGELOG_RELEASE.md
+            echo "" >> CHANGELOG_RELEASE.md
+            
+            # Documentation
+            echo "### 📚 Documentation" >> CHANGELOG_RELEASE.md
+            git log ${PREVIOUS_TAG}..HEAD --grep="docs:" --pretty=format:"* %s (%h)" >> CHANGELOG_RELEASE.md || echo "* No documentation changes" >> CHANGELOG_RELEASE.md
+            echo "" >> CHANGELOG_RELEASE.md
+            
+            # Other Changes
+            echo "### 🔧 Other Changes" >> CHANGELOG_RELEASE.md
+            git log ${PREVIOUS_TAG}..HEAD --grep -v "feat:\|fix:\|docs:" --pretty=format:"* %s (%h)" | head -20 >> CHANGELOG_RELEASE.md
+            echo "" >> CHANGELOG_RELEASE.md
+          fi
+          
+          # Add contributors
+          echo "## 👥 Contributors" >> CHANGELOG_RELEASE.md
+          git log ${PREVIOUS_TAG}..HEAD --pretty=format:"%an" | sort -u | sed 's/^/* @/' >> CHANGELOG_RELEASE.md
+          echo "" >> CHANGELOG_RELEASE.md
+          
+          # Add installation instructions
+          cat >> CHANGELOG_RELEASE.md << 'EOF'
+          
+          ## 📦 Installation
+          
+          ### Docker
+          ```bash
+          docker pull ghcr.io/${{ github.repository }}:${{ steps.version.outputs.version }}
+          ```
+          
+          ### Binary
+          Download the appropriate binary for your platform from the assets below.
+          
+          ### From Source
+          ```bash
+          go install github.com/${{ github.repository }}/cmd/server@${{ steps.version.outputs.version }}
+          ```
+          
+          ## 📋 Full Changelog
+          
+          EOF
+          
+          if [ -n "$PREVIOUS_TAG" ]; then
+            echo "**Full Changelog**: https://github.com/${{ github.repository }}/compare/${PREVIOUS_TAG}...${{ steps.version.outputs.version }}" >> CHANGELOG_RELEASE.md
+          fi
+
+      - name: Create release branch
+        run: |
+          git checkout -b release/${{ steps.version.outputs.version }}
+          git add -A
+          git commit -m "chore: prepare release ${{ steps.version.outputs.version }}" || echo "No changes to commit"
+          git push origin release/${{ steps.version.outputs.version }}
+
+      - name: Create Pull Request
+        uses: peter-evans/create-pull-request@v5
+        with:
+          title: "Release ${{ steps.version.outputs.version }}"
+          body: |
+            ## 🚀 Release ${{ steps.version.outputs.version }}
+            
+            This PR prepares the release for version ${{ steps.version.outputs.version }}.
+            
+            ### Checklist
+            - [ ] Version updated in files
+            - [ ] Changelog generated
+            - [ ] Tests passing
+            - [ ] Security scans passing
+            - [ ] Documentation updated
+            
+            ### Next Steps
+            1. Review and merge this PR
+            2. Tag will be created automatically
+            3. Release workflow will build and publish artifacts
+          branch: release/${{ steps.version.outputs.version }}
+          base: ${{ github.event.repository.default_branch }}
+
+  create-tag:
+    name: Create Tag
+    runs-on: ubuntu-latest
+    needs: prepare-release
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Create and push tag
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git tag -a ${{ needs.prepare-release.outputs.version }} -m "Release ${{ needs.prepare-release.outputs.version }}"
+          git push origin ${{ needs.prepare-release.outputs.version }}
+
+  notification:
+    name: Send Notifications
+    runs-on: ubuntu-latest
+    needs: [prepare-release]
+    if: always()
+    
+    steps:
+      - name: Send Slack notification
+        if: vars.SLACK_WEBHOOK_URL != ''
+        run: |
+          curl -X POST ${{ vars.SLACK_WEBHOOK_URL }} \
+            -H 'Content-Type: application/json' \
+            -d "{
+              \"text\": \"Release ${{ needs.prepare-release.outputs.version }} has been prepared!\",
+              \"attachments\": [{
+                \"color\": \"good\",
+                \"title\": \"PropGuard Release\",
+                \"title_link\": \"https://github.com/${{ github.repository }}/releases\",
+                \"fields\": [
+                  {\"title\": \"Version\", \"value\": \"${{ needs.prepare-release.outputs.version }}\", \"short\": true},
+                  {\"title\": \"Type\", \"value\": \"${{ github.event.inputs.release_type }}\", \"short\": true}
+                ]
+              }]
+            }"
+
+      - name: Create GitHub Issue for release tracking
+        uses: actions/github-script@v7
+        with:
+          script: |
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title: `Release ${{ needs.prepare-release.outputs.version }} Tracking`,
+              body: `## Release ${{ needs.prepare-release.outputs.version }}
+              
+              ### Pre-release Checklist
+              - [ ] All tests passing
+              - [ ] Security scans completed
+              - [ ] Documentation updated
+              - [ ] Changelog reviewed
+              - [ ] Version numbers updated
+              
+              ### Post-release Checklist
+              - [ ] Docker images published
+              - [ ] GitHub release created
+              - [ ] Release notes published
+              - [ ] Team notified
+              
+              ### Testing Checklist
+              - [ ] Smoke tests on staging
+              - [ ] Integration tests passing
+              - [ ] Performance benchmarks acceptable
+              
+              cc @${{ github.actor }}`,
+              labels: ['release', 'tracking'],
+              milestone: context.payload.milestone?.number
+            })

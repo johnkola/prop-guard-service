@@ -11,7 +11,7 @@ import (
 	"syscall"
 	"time"
 
-	_ "PropGuard/docs"
+	// _ "PropGuard/docs" // Commented out - docs will be regenerated
 	"PropGuard/internal/config"
 	"PropGuard/internal/controller"
 	"PropGuard/internal/repository"
@@ -99,8 +99,10 @@ func main() {
 	userRepo := repository.NewBadgerUserRepository(badgerClient)
 	secretRepo := repository.NewBadgerSecretRepository(badgerClient)
 	auditRepo := repository.NewBadgerAuditRepository(badgerClient, cfg.Vault.AuditRetentionDays)
-	// apiKeyRepo := repository.NewBadgerAPIKeyRepository(badgerClient) // Removed - service not used
+	envParamRepo := repository.NewBadgerEnvParamRepository(badgerClient)
+	// apiKeyRepo := repository.NewBadgerAPIKeyRepository(badgerClient) // Temporarily disabled for Phase 3 completion
 	roleRepo := repository.NewBadgerRoleRepository(badgerClient)
+	teamRepo := repository.NewBadgerTeamRepository(badgerClient)
 
 	// Initialize services
 	encryptionService := service.NewEncryptionService(cfg.Vault.MasterKey)
@@ -108,7 +110,9 @@ func main() {
 	authService := service.NewAuthService(userRepo, auditService, cfg.JWT.Secret, cfg.JWT.ExpiryHours)
 	secretService := service.NewSecretService(secretRepo, userRepo, encryptionService, auditService)
 	userService := service.NewUserService(userRepo, auditService)
-	// envParamService := service.NewEnvParamService() // Removed - service not used
+	teamService := service.NewTeamService(teamRepo, auditService)
+	envParamService := service.NewEnvParamService(envParamRepo, encryptionService, auditService)
+	// apiKeyService := service.NewAPIKeyService(apiKeyRepo, auditService) // Temporarily disabled
 
 	// Initialize middleware
 	jwtMiddleware := security.NewJWTMiddleware(authService)
@@ -119,10 +123,12 @@ func main() {
 	userController := controller.NewUserController(userService, jwtMiddleware)
 	roleController := controller.NewRoleController(roleRepo, auditService, jwtMiddleware)
 	auditController := controller.NewAuditController(auditRepo, auditService, jwtMiddleware)
-	// Batch keys controller removed - dependencies not available
+	teamController := controller.NewTeamController(teamService, jwtMiddleware)
+	envParamController := controller.NewEnvParamController(envParamService)
+	// apiKeyController := controller.NewAPIKeyController(apiKeyService, jwtMiddleware) // Temporarily disabled
 
 	// Setup Gin router
-	router := setupRouter(authController, secretController, userController, roleController, auditController, badgerClient)
+	router := setupRouter(authController, secretController, userController, roleController, auditController, teamController, envParamController, badgerClient)
 
 	// Create HTTP server
 	srv := &http.Server{
@@ -157,7 +163,7 @@ func main() {
 	log.Println("Server shutdown complete")
 }
 
-func setupRouter(authController *controller.AuthController, secretController *controller.SecretController, userController *controller.UserController, roleController *controller.RoleController, auditController *controller.AuditController, badgerClient *repository.BadgerClient) *gin.Engine {
+func setupRouter(authController *controller.AuthController, secretController *controller.SecretController, userController *controller.UserController, roleController *controller.RoleController, auditController *controller.AuditController, teamController *controller.TeamController, envParamController *controller.EnvParamController, badgerClient *repository.BadgerClient) *gin.Engine {
 	// Set Gin mode based on environment
 	if os.Getenv("GIN_MODE") == "" {
 		gin.SetMode(gin.ReleaseMode)
@@ -265,7 +271,21 @@ func setupRouter(authController *controller.AuthController, secretController *co
 		userController.RegisterRoutes(v1)
 		roleController.RegisterRoutes(v1)
 		auditController.RegisterRoutes(v1)
-		// Batch keys routes removed - service dependencies not available
+		teamController.RegisterRoutes(v1)
+
+		// Environment Parameters routes
+		v1.GET("/env-params", envParamController.ListAllEnvParams)
+		v1.POST("/env-params", envParamController.CreateEnvParam)
+		v1.POST("/env-params/bulk", envParamController.BulkCreateEnvParams)
+		v1.GET("/env-params/environments", envParamController.GetEnvironments)
+		v1.GET("/env-params/:environment", envParamController.ListEnvParams)
+		v1.POST("/env-params/:environment/batch", envParamController.GetEnvParams)
+		v1.GET("/env-params/:environment/:key", envParamController.GetEnvParam)
+		v1.PUT("/env-params/:environment/:key", envParamController.UpdateEnvParam)
+		v1.DELETE("/env-params/:environment/:key", envParamController.DeleteEnvParam)
+
+		// API Key Management routes - temporarily disabled for Phase 3 completion
+		// apiKeyController.RegisterRoutes(v1)
 	}
 
 	return router
